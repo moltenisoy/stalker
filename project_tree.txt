@@ -1,0 +1,32 @@
+.
+├─ setup_project.bat
+├─ requirements.txt
+├─ main.py
+├─ core/
+│  ├─ app.py
+│  ├─ search.py
+│  ├─ engine.py
+│  ├─ storage.py
+│  ├─ hotkey.py
+│  └─ config.py
+├─ modules/
+│  ├─ calculator.py
+│  ├─ clipboard_manager.py
+│  ├─ keystroke.py
+│  ├─ snippet_manager.py
+│  ├─ app_launcher.py
+│  ├─ file_indexer.py
+│  ├─ quicklinks.py
+│  ├─ window_manager.py
+│  ├─ grid_preview.py
+│  ├─ macro_recorder.py
+│  ├─ hotkeys_window.py
+│  ├─ syshealth.py
+│  ├─ ai_assistant.py
+│  ├─ notes.py
+│  ├─ plugin_shell.py
+│  └─ diagnostics.py
+└─ ui/
+   ├─ launcher.py
+   ├─ notes_editor.py
+   └─ settings_panel.py

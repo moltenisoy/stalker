@@ -1,0 +1,197 @@
+from dataclasses import dataclass
+from typing import Callable, List, Optional
+from core.config import ConfigManager
+from modules.calculator import Calculator
+from modules.clipboard_manager import ClipboardManager
+from modules.snippet_manager import SnippetManager
+from modules.app_launcher import AppLauncher
+from modules.file_indexer import FileIndexer
+from modules.quicklinks import Quicklinks
+from modules.macro_recorder import MacroRecorder
+from modules.syshealth import SysHealth
+from modules.ai_assistant import AIAssistant
+from modules.notes import NotesManager
+from modules.plugin_shell import PluginShell
+from modules.diagnostics import log
+
+@dataclass
+class SearchResult:
+    title: str
+    subtitle: str = ""
+    action: Optional[Callable] = None
+    copy_text: Optional[str] = None
+    group: str = "general"
+    meta: dict = None
+
+class SearchEngine:
+    def __init__(self, config: Optional[ConfigManager] = None):
+        self.config = config or ConfigManager()
+        m = self.config.data["modules"]
+        perf = self.config.data["performance_mode"]
+
+        self.calculator = Calculator()
+        self.clipboard_mgr = ClipboardManager() if m.get("clipboard") else None
+        self.snippet_mgr = SnippetManager() if m.get("snippets") else None
+        self.app_launcher = AppLauncher()
+        self.file_indexer = FileIndexer() if m.get("files") else None
+        if self.file_indexer and perf:
+            self.file_indexer.pause(True)
+        self.quicklinks = Quicklinks() if m.get("links") else None
+        self.macro_recorder = MacroRecorder() if m.get("macros") else None
+        self.syshealth = SysHealth() if m.get("optimizer") else None
+        self.ai = AIAssistant() if m.get("ai") and not perf else None
+        self.notes = NotesManager()
+        self.plugin_shell = PluginShell()
+
+        if self.file_indexer and not perf:
+            self.file_indexer.start()
+
+        self.internal_commands = [
+            SearchResult("/clipboard", "Historial de portapapeles", group="command"),
+            SearchResult("/snippets", "Gestionar snippets", group="command"),
+            SearchResult("/files", "Buscar en índice de archivos", group="command"),
+            SearchResult("/links", "Accesos directos personalizados", group="command"),
+            SearchResult("/macros", "Macros grabadas", group="command"),
+            SearchResult("/syshealth", "Monitor de sistema y procesos", group="command"),
+            SearchResult("/ai", "Asistente de IA (cloud/local) o '>'", group="command"),
+            SearchResult("/notes", "Notas markdown seguras", group="command"),
+            SearchResult(">config", "Panel de configuración profunda", group="command"),
+        ]
+
+    def search(self, query: str) -> List[SearchResult]:
+        text = query.strip()
+        qlow = text.lower()
+        results: List[SearchResult] = []
+
+        # Config command
+        if qlow.startswith(">config") or qlow.startswith("settings"):
+            return self._config_results()
+
+        # Performance mode note
+        perf = self.config.data["performance_mode"]
+
+        # Calculator
+        if (calc := self.calculator.try_calculate(text)):
+            results.append(calc)
+
+        # Snippet direct
+        if self.snippet_mgr and (text.startswith("@") or text.startswith(";")):
+            sn = self.snippet_mgr.resolve_trigger(text)
+            if sn:
+                results.append(sn)
+
+        # Flags
+        is_ai = qlow.startswith("/ai") or qlow.startswith(">")
+        is_notes = qlow.startswith("/notes")
+        is_clip = qlow.startswith("/clipboard") or qlow.startswith("/clip")
+        is_snip = qlow.startswith("/snippets") or qlow.startswith("/snippet")
+        is_files = qlow.startswith("/files")
+        is_links = qlow.startswith("/links") or qlow.startswith("/link")
+        is_macro = qlow.startswith("/macros") or qlow.startswith("/macro")
+        is_sys = qlow.startswith("/syshealth") or qlow.startswith("/sys")
+
+        if is_ai and self.ai:
+            prompt = text[1:] if qlow.startswith(">") else text.replace("/ai", "").strip()
+            results.append(SearchResult(
+                title=f"Preguntar IA: {prompt[:64]}",
+                subtitle="Cloud/Local BYOK",
+                action=lambda p=prompt: log(self.ai.ask(p)),
+                group="ai",
+            ))
+        elif is_ai and perf:
+            results.append(SearchResult(title="IA desactivada en Modo Ahorro", group="ai"))
+
+        if is_notes:
+            qnotes = text.replace("/notes", "").strip()
+            for n in self.notes.search(qnotes, limit=30):
+                results.append(SearchResult(title=n.title, subtitle=n.body[:80], copy_text=n.body, group="note"))
+            results.append(SearchResult(title="Crear nota rápida", subtitle=qnotes or "Sin título",
+                                        action=lambda t=qnotes: self.notes.create(t or "Sin título", "", ""), group="note"))
+        if is_clip and self.clipboard_mgr:
+            results += self._clipboard_results(text.replace("/clipboard", "").replace("/clip", "").strip())
+        if is_snip and self.snippet_mgr:
+            results += self.snippet_mgr.search(text.replace("/snippets", "").replace("/snippet", "").strip(), limit=30)
+        if is_files and self.file_indexer:
+            results += self._file_results(text.replace("/files", "").strip())
+        if is_links and self.quicklinks:
+            results += self.quicklinks.search(text.replace("/links", "").replace("/link", "").strip(), limit=50)
+        if is_macro and self.macro_recorder:
+            results += self.macro_recorder.search_macros(text.replace("/macros", "").replace("/macro", "").strip(), limit=30)
+        if is_sys and self.syshealth:
+            results += self._syshealth_results()
+
+        # default search
+        if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys]):
+            results += [r for r in self.internal_commands if qlow in r.title.lower()]
+        return results
+
+    def _config_results(self):
+        perf = self.config.data["performance_mode"]
+        mods = self.config.data["modules"]
+        return [
+            SearchResult("Toggle Modo Ahorro", f"Actualmente: {'ON' if perf else 'OFF'}",
+                         action=lambda: self._toggle_perf(), group="config"),
+            SearchResult("Exportar configuración", "Export JSON", action=self._export_config, group="config"),
+            SearchResult("Importar configuración", "Import JSON (ruta fija)", action=self._import_config, group="config"),
+            SearchResult("Reiniciar servicios", "Reinicia indexador/IA/monitor", action=self._restart_services, group="config"),
+            *[SearchResult(f"Modulo {k}", f"{'ON' if v else 'OFF'}", action=lambda key=k, val=not mods[k]: self._toggle_module(key, val), group="config") for k, v in mods.items()],
+        ]
+
+    def _toggle_perf(self):
+        new_val = not self.config.data["performance_mode"]
+        self.config.toggle_performance_mode(new_val)
+        if self.file_indexer:
+            self.file_indexer.pause(new_val)
+        if new_val:
+            # reduce visuals, disable AI usage
+            pass
+        log(f"performance_mode={new_val}")
+
+    def _toggle_module(self, key: str, val: bool):
+        self.config.set_module_enabled(key, val)
+        log(f"module {key} => {val}")
+
+    def _export_config(self):
+        from pathlib import Path
+        dest = Path.home() / ".fastlauncher" / "config.export.json"
+        self.config.export(dest)
+        log(f"config export {dest}")
+
+    def _import_config(self):
+        from pathlib import Path
+        src = Path.home() / ".fastlauncher" / "config.import.json"
+        if src.exists():
+            self.config.import_file(src)
+            log(f"config import {src}")
+
+    def _restart_services(self):
+        # Simple reinicio: re-lanzar indexador si aplica
+        if self.file_indexer and not self.config.data["performance_mode"]:
+            self.file_indexer.start()
+        log("Servicios reiniciados")
+
+    def _clipboard_results(self, q: str):
+        rows = self.clipboard_mgr.search(q=q, limit=40)
+        out = []
+        for row in rows:
+            kind = row["kind"]
+            content = row["content"]
+            display = content if kind == "image" else content.decode("utf-8", errors="ignore")
+            title = display if len(display) < 80 else display[:77] + "..."
+            out.append(SearchResult(title=title, subtitle=f"Clipboard • {kind}", copy_text=display, group="clipboard"))
+        return out
+
+    def _file_results(self, q: str):
+        rows = self.file_indexer.search(q=q, limit=60)
+        return [SearchResult(title=r["name"], subtitle=f"{r['drive']} • {r['path']}", copy_text=r["path"], group="file") for r in rows]
+
+    def _syshealth_results(self):
+        snap = self.syshealth.snapshot()
+        header = SearchResult(
+            title=f"CPU {snap.cpu_percent:.0f}% | RAM {snap.ram_used_gb:.1f}/{snap.ram_total_gb:.1f} GB | "
+                  f"Disk {snap.disk_read_mb_s:.1f}R/{snap.disk_write_mb_s:.1f}W | "
+                  f"Net {snap.net_down_mb_s:.1f}↓/{snap.net_up_mb_s:.1f}↑ MB/s",
+            subtitle="Monitor en tiempo real (/syshealth)",
+            group="syshealth",
+        )
+        return [header]

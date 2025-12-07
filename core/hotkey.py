@@ -1,0 +1,20 @@
+import threading
+import keyboard  # global hotkeys on Windows
+
+DEFAULT_HOTKEY = "ctrl+space"  # avoids Alt+Space conflicts with PowerToys
+
+class GlobalHotkey:
+    def __init__(self, callback, hotkey: str = DEFAULT_HOTKEY):
+        self.callback = callback
+        self.hotkey = hotkey
+        self._listener_thread = None
+
+    def register(self):
+        if self._listener_thread and self._listener_thread.is_alive():
+            return
+        self._listener_thread = threading.Thread(target=self._listen, daemon=True)
+        self._listener_thread.start()
+
+    def _listen(self):
+        keyboard.add_hotkey(self.hotkey, self.callback, suppress=False, trigger_on_release=True)
+        keyboard.wait()  # block thread to keep listener alive

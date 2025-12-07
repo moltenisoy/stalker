@@ -1,0 +1,8 @@
+PySide6>=6.6
+keyboard>=0.13
+pywin32>=306
+watchdog>=4.0.0
+psutil>=5.9.8
+wmi>=1.5.1
+mouse>=0.7.1
+requests>=2.31.0
