@@ -206,3 +206,73 @@ class Storage:
         conn = self._conn()
         conn.row_factory = sqlite3.Row
         return conn.execute(sql, args).fetchall()
+
+    def replace_file_index(self, records: List[tuple]):
+        """Replace entire file index with new records. Each record is (path, drive, name, updated_at)."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM file_index")
+            if records:
+                conn.executemany(
+                    "INSERT INTO file_index(path, drive, name, updated_at) VALUES (?, ?, ?, ?)",
+                    records
+                )
+            conn.commit()
+
+    def list_files(self, q: str = "", limit: int = 80):
+        """Search indexed files by name."""
+        sql = "SELECT path, drive, name FROM file_index"
+        args = []
+        if q:
+            sql += " WHERE name LIKE ?"
+            args.append(f"%{q}%")
+        sql += " ORDER BY name LIMIT ?"
+        args.append(limit)
+        conn = self._conn()
+        conn.row_factory = sqlite3.Row
+        return conn.execute(sql, args).fetchall()
+
+    def get_app_by_alias(self, alias: str):
+        """Get app by its alias."""
+        conn = self._conn()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM apps WHERE alias=?", (alias,)).fetchone()
+        return dict(row) if row else None
+
+    def list_apps(self, q: str = "", limit: int = 50):
+        """Search apps by name or path."""
+        sql = "SELECT * FROM apps"
+        args = []
+        if q:
+            sql += " WHERE name LIKE ? OR path LIKE ? OR alias LIKE ?"
+            args.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+        sql += " ORDER BY name LIMIT ?"
+        args.append(limit)
+        conn = self._conn()
+        conn.row_factory = sqlite3.Row
+        return conn.execute(sql, args).fetchall()
+
+    def add_app(self, name: str, path: str, alias: str = None):
+        """Add or update an app in the database."""
+        now = time.time()
+        with self._conn() as conn:
+            if alias:
+                # Try to update existing by alias, or insert new
+                conn.execute(
+                    "INSERT OR REPLACE INTO apps(name, path, alias, created_at) VALUES (?, ?, ?, ?)",
+                    (name, path, alias, now)
+                )
+            else:
+                # No alias - just insert if not exists by path
+                existing = conn.execute("SELECT id FROM apps WHERE path=?", (path,)).fetchone()
+                if not existing:
+                    conn.execute(
+                        "INSERT INTO apps(name, path, alias, created_at) VALUES (?, ?, ?, ?)",
+                        (name, path, None, now)
+                    )
+            conn.commit()
+
+    def clear_app_cache(self):
+        """Clear all apps from cache (typically before re-scanning)."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM apps WHERE alias IS NULL")
+            conn.commit()

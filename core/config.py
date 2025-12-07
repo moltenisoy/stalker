@@ -27,6 +27,10 @@ _DEFAULTS: Dict[str, Any] = {
     },
     "performance_mode": False,
     "plugin_shell": {"enabled": True},
+    "file_indexer": {
+        "roots": [],  # Empty means use home directory as default
+        "watch_enabled": False,  # Optional watchdog feature
+    },
 }
 
 
@@ -261,3 +265,27 @@ class ConfigManager:
     def get_module_enabled(self, module: str) -> bool:
         """Check if a module is enabled."""
         return bool(self.data.get("modules", {}).get(module, _DEFAULTS["modules"].get(module, False)))
+
+    def get_file_indexer_roots(self):
+        """Get file indexer roots."""
+        file_indexer = self.data.get("file_indexer", _DEFAULTS.get("file_indexer", {}))
+        return file_indexer.get("roots", [])
+
+    def set_file_indexer_roots(self, roots: list):
+        """Set file indexer roots."""
+        if "file_indexer" not in self.data:
+            self.data["file_indexer"] = copy.deepcopy(_DEFAULTS["file_indexer"])
+        self.data["file_indexer"]["roots"] = roots
+        self.save()
+
+    def get_file_indexer_watch_enabled(self) -> bool:
+        """Get whether watchdog is enabled for file indexer."""
+        file_indexer = self.data.get("file_indexer", _DEFAULTS.get("file_indexer", {}))
+        return bool(file_indexer.get("watch_enabled", False))
+
+    def set_file_indexer_watch_enabled(self, enabled: bool):
+        """Set whether watchdog is enabled for file indexer."""
+        if "file_indexer" not in self.data:
+            self.data["file_indexer"] = copy.deepcopy(_DEFAULTS["file_indexer"])
+        self.data["file_indexer"]["watch_enabled"] = bool(enabled)
+        self.save()
