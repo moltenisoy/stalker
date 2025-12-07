@@ -1,5 +1,6 @@
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QPalette, QColor, QIcon, QAction
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QSystemTrayIcon, QMenu
 from ui.launcher import LauncherWindow
 from core.hotkey import GlobalHotkey
 from core.config import ConfigManager
@@ -18,6 +19,10 @@ class LauncherApp:
         
         # System health overlay (lazy initialization)
         self._syshealth_overlay: Optional[object] = None
+        
+        # System tray icon
+        self._tray_icon: Optional[QSystemTrayIcon] = None
+        self._init_system_tray()
 
     def start(self):
         # Apply theme from config
@@ -58,6 +63,86 @@ class LauncherApp:
         if self._syshealth_overlay:
             self._syshealth_overlay.toggle_visibility()
 
+    def _init_system_tray(self):
+        """Initialize system tray icon with menu."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        
+        # Create tray icon (use built-in icon for now)
+        self._tray_icon = QSystemTrayIcon(self.qt_app)
+        
+        # Try to use application icon or fallback to information icon
+        icon = self.qt_app.style().standardIcon(self.qt_app.style().StandardPixmap.SP_ComputerIcon)
+        self._tray_icon.setIcon(icon)
+        self._tray_icon.setToolTip("Stalker - Fast Launcher")
+        
+        # Create tray menu
+        tray_menu = QMenu()
+        
+        # Show/Hide action
+        show_action = QAction("Show Launcher", self.qt_app)
+        show_action.triggered.connect(self.toggle_visibility)
+        tray_menu.addAction(show_action)
+        
+        # Settings action
+        settings_action = QAction("Settings", self.qt_app)
+        settings_action.triggered.connect(self._open_settings_from_tray)
+        tray_menu.addAction(settings_action)
+        
+        # System Health Overlay toggle
+        overlay_action = QAction("Toggle System Health Overlay", self.qt_app)
+        overlay_action.triggered.connect(self.toggle_syshealth_overlay)
+        tray_menu.addAction(overlay_action)
+        
+        tray_menu.addSeparator()
+        
+        # Exit action
+        exit_action = QAction("Exit", self.qt_app)
+        exit_action.triggered.connect(self.quit_application)
+        tray_menu.addAction(exit_action)
+        
+        self._tray_icon.setContextMenu(tray_menu)
+        
+        # Connect tray icon activation (click)
+        self._tray_icon.activated.connect(self._on_tray_activated)
+        
+        # Show the tray icon
+        self._tray_icon.show()
+    
+    def _on_tray_activated(self, reason):
+        """Handle tray icon activation."""
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            # Left click - toggle window
+            self.toggle_visibility()
+        elif reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            # Double click - show window
+            self.window.center_and_show()
+    
+    def _open_settings_from_tray(self):
+        """Open settings panel from tray menu."""
+        # Show launcher first
+        self.window.center_and_show()
+        # Then trigger settings command
+        self.window.query_edit.setText(">config")
+        self.window.query_edit.returnPressed.emit()
+    
+    def quit_application(self):
+        """Quit the application gracefully."""
+        # Unregister hotkey
+        if self.hotkey:
+            self.hotkey.unregister()
+        
+        # Hide tray icon
+        if self._tray_icon:
+            self._tray_icon.hide()
+        
+        # Close overlay if exists
+        if self._syshealth_overlay:
+            self._syshealth_overlay.close()
+        
+        # Quit application
+        self.qt_app.quit()
+    
     def _apply_theme(self, dark=True):
         """Apply global application theme from config."""
         palette = QPalette()
