@@ -56,6 +56,9 @@ class SysHealth:
         self._last_proc_refresh = 0
         self._refresh_thread: Optional[Thread] = None
         self._running = False
+        
+        # Cached snapshot for sampling
+        self._cached_snapshot: Optional[ResourceSnapshot] = None
 
     def snapshot(self, use_sampling: bool = True) -> ResourceSnapshot:
         """
@@ -67,13 +70,15 @@ class SysHealth:
         """
         now = time.time()
         
-        # Check if we should wait for next sample (low overhead mode)
-        if use_sampling and (now - self._last_time) < self._sampling_interval:
-            # Return cached values if within sampling interval
-            dt = max(now - self._last_time, 0.001)
-        else:
-            dt = max(now - self._last_time, 0.001)
+        # Check if we should return cached snapshot (low overhead mode)
+        if use_sampling and self._cached_snapshot and (now - self._last_time) < self._sampling_interval:
+            # Return cached snapshot if within sampling interval
+            return self._cached_snapshot
+        
+        # Calculate time delta for rate calculations
+        dt = max(now - self._last_time, 0.001)
 
+        # Fetch fresh metrics
         disk = psutil.disk_io_counters()
         net = psutil.net_io_counters()
         disk_read_mb_s = (disk.read_bytes - self._last_disk.read_bytes) / (1024 * 1024) / dt
@@ -88,7 +93,8 @@ class SysHealth:
         vm = psutil.virtual_memory()
         cpu = psutil.cpu_percent(interval=None)
 
-        return ResourceSnapshot(
+        # Create and cache snapshot
+        self._cached_snapshot = ResourceSnapshot(
             cpu_percent=cpu,
             ram_used_gb=vm.used / (1024**3),
             ram_total_gb=vm.total / (1024**3),
@@ -98,6 +104,8 @@ class SysHealth:
             net_down_mb_s=net_down_mb_s,
             timestamp=now,
         )
+        
+        return self._cached_snapshot
 
     def start_background_refresh(self):
         """Start background thread for process list refresh."""
