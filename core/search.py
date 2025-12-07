@@ -1,5 +1,6 @@
 from PySide6.QtCore import QTimer, Signal, QObject
-from core.engine import SearchEngine, SearchResult
+from core.engine import SearchEngine
+from core.types import SearchResult
 
 class PredictiveSearch(QObject):
     results_ready = Signal(list)

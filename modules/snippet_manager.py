@@ -3,7 +3,7 @@ import time
 from typing import Optional, List
 import keyboard
 from core.storage import Storage
-from core.engine import SearchResult
+from core.types import SearchResult
 from modules.keystroke import send_text_ime_safe
 
 class SnippetManager:

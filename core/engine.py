@@ -1,8 +1,8 @@
 import subprocess
 import win32clipboard
-from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import List, Optional
 from core.config import ConfigManager
+from core.types import SearchResult
 from modules.calculator import Calculator
 from modules.clipboard_manager import ClipboardManager
 from modules.snippet_manager import SnippetManager
@@ -21,16 +21,6 @@ from core.context_profiles import ContextProfileManager
 from core.flow_commands import FlowCommandManager
 from modules.contextual_actions import ContextualActionsManager
 from modules.window_manager import get_active_window_info, detect_app_context
-
-@dataclass
-class SearchResult:
-    title: str
-    subtitle: str = ""
-    action: Optional[Callable] = None
-    copy_text: Optional[str] = None
-    group: str = "general"
-    meta: dict = None
-    score: float = 0.0  # Higher score = higher priority
 
 class SearchEngine:
     def __init__(self, config: Optional[ConfigManager] = None):

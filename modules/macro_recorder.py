@@ -6,7 +6,7 @@ import mouse
 from dataclasses import dataclass, field
 from typing import List, Literal, Any, Callable, Optional
 from core.storage import Storage
-from core.engine import SearchResult
+from core.types import SearchResult
 
 EventType = Literal["key", "click"]
 

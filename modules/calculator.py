@@ -3,7 +3,7 @@ import operator as op
 import re
 from dataclasses import dataclass
 from typing import Optional
-from core.engine import SearchResult
+from core.types import SearchResult
 
 # Operadores seguros
 _ALLOWED = {

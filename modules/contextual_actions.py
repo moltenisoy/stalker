@@ -6,7 +6,7 @@ import re
 import win32clipboard
 import win32gui
 from typing import List, Optional, Dict
-from core.engine import SearchResult
+from core.types import SearchResult
 from modules.keystroke import send_text_ime_safe
 
 class ContextualActionsManager:
