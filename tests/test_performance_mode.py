@@ -9,7 +9,7 @@ import os
 # Add parent directory to path to import core modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from core.config import ConfigManager
+from core import ConfigManager
 
 
 def test_performance_mode_config_integration():

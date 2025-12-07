@@ -10,7 +10,7 @@ import os
 # Add parent directory to path to import core modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from core.config import ConfigManager, _validate_ui_config, _validate_hotkey, _validate_modules, _DEFAULTS
+from core import ConfigManager, _validate_ui_config, _validate_hotkey, _validate_modules, _DEFAULTS
 
 
 def test_defaults():

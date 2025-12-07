@@ -9,8 +9,8 @@ import time
 # Add parent directory to path to import modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from modules.syshealth import SysHealth, ResourceSnapshot, ProcInfo
-from core.config import ConfigManager
+from modules_monitoring import SysHealth, ResourceSnapshot, ProcInfo
+from core import ConfigManager
 import tempfile
 from pathlib import Path
 

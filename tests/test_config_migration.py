@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def test_bundled_config_path_detection():
     """Test detection of bundled config path."""
-    from core.config import _get_bundled_config_path
+    from core import config import _get_bundled_config_path
     
     bundled_path = _get_bundled_config_path()
     
@@ -27,7 +27,7 @@ def test_bundled_config_path_detection():
 
 def test_config_migration_logic():
     """Test that config migration works correctly."""
-    from core.config import _copy_default_config_on_first_run, CONFIG_PATH, _get_bundled_config_path
+    from core import config import _copy_default_config_on_first_run, CONFIG_PATH, _get_bundled_config_path
     
     # Create a temporary directory for testing
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -68,7 +68,7 @@ def test_config_migration_logic():
 
 def test_config_not_overwritten_if_exists():
     """Test that existing config is not overwritten."""
-    from core.config import _copy_default_config_on_first_run
+    from core import config import _copy_default_config_on_first_run
     
     with tempfile.TemporaryDirectory() as tmpdir:
         test_config_path = Path(tmpdir) / ".fastlauncher" / "config.json"

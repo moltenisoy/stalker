@@ -11,9 +11,9 @@ import os
 # Add parent directory to path to import core modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from core.storage import Storage
-from core.config import ConfigManager
-from modules.file_indexer import FileIndexer
+from core import Storage
+from core import ConfigManager
+from modules_files import FileIndexer
 
 
 def test_full_file_indexing_flow():

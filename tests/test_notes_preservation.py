@@ -10,8 +10,8 @@ import os
 # Add parent directory to path to import core modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from core.storage import Storage
-from modules.notes import NotesManager
+from core import Storage
+from modules_ai import NotesManager
 
 
 def test_special_characters_preserved():
