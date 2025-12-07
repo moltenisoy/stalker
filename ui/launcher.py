@@ -174,6 +174,8 @@ class LauncherWindow(QWidget):
             self._activate_current(); return
         if key == Qt.Key_C and modifiers & Qt.ControlModifier:
             self._copy_current(); return
+        if key == Qt.Key_O and modifiers & Qt.ControlModifier:
+            self._open_folder_current(); return
         if key == Qt.Key_V and modifiers & Qt.ControlModifier and modifiers & Qt.ShiftModifier:
             self._paste_plain_current(); return
         if key == Qt.Key_W and modifiers & Qt.ControlModifier:
@@ -201,6 +203,20 @@ class LauncherWindow(QWidget):
         res: SearchResult = current.data(Qt.UserRole)
         if res and res.copy_text:
             self._copy_text(res.copy_text)
+
+    def _open_folder_current(self):
+        """Open containing folder for the current item (Ctrl+O)."""
+        current = self.list.currentItem()
+        if not current:
+            return
+        res: SearchResult = current.data(Qt.UserRole)
+        # Check if this is a file result with the open folder action
+        if res and res.meta and "open_folder_action" in res.meta:
+            try:
+                res.meta["open_folder_action"]()
+                self.hide()
+            except Exception as ex:
+                print(f"Error opening folder: {ex}")
 
     def _paste_plain_current(self):
         current = self.list.currentItem()
