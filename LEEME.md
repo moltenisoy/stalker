@@ -142,6 +142,14 @@ Puedes editarla manualmente o usar el panel de configuración dentro de la aplic
 3. **Búsqueda de archivos**: Configura las carpetas a indexar en configuración
 4. **AI Assistant**: Necesitas tu propia API key (OpenAI o Anthropic)
 
+## 📚 Documentación Adicional
+
+- **[Mejoras y Sugerencias](MEJORAS_Y_SUGERENCIAS.md)**: Documento completo con:
+  - Análisis de arquitectura del proyecto
+  - 15 sugerencias de mejora de código
+  - 15 sugerencias de nuevas funcionalidades
+  - Verificación de todas las características existentes
+
 ## 📧 Soporte
 
 - **Problemas**: Abre un issue en [GitHub Issues](https://github.com/moltenisoy/stalker/issues)
