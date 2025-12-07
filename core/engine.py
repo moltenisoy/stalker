@@ -26,20 +26,19 @@ class SearchResult:
 class SearchEngine:
     def __init__(self, config: Optional[ConfigManager] = None):
         self.config = config or ConfigManager()
-        m = self.config.data["modules"]
-        perf = self.config.data["performance_mode"]
+        perf = self.config.get_performance_mode()
 
         self.calculator = Calculator()
-        self.clipboard_mgr = ClipboardManager() if m.get("clipboard") else None
-        self.snippet_mgr = SnippetManager() if m.get("snippets") else None
+        self.clipboard_mgr = ClipboardManager() if self.config.get_module_enabled("clipboard") else None
+        self.snippet_mgr = SnippetManager() if self.config.get_module_enabled("snippets") else None
         self.app_launcher = AppLauncher()
-        self.file_indexer = FileIndexer() if m.get("files") else None
+        self.file_indexer = FileIndexer() if self.config.get_module_enabled("files") else None
         if self.file_indexer and perf:
             self.file_indexer.pause(True)
-        self.quicklinks = Quicklinks() if m.get("links") else None
-        self.macro_recorder = MacroRecorder() if m.get("macros") else None
-        self.syshealth = SysHealth() if m.get("optimizer") else None
-        self.ai = AIAssistant() if m.get("ai") and not perf else None
+        self.quicklinks = Quicklinks() if self.config.get_module_enabled("links") else None
+        self.macro_recorder = MacroRecorder() if self.config.get_module_enabled("macros") else None
+        self.syshealth = SysHealth() if self.config.get_module_enabled("optimizer") else None
+        self.ai = AIAssistant() if self.config.get_module_enabled("ai") and not perf else None
         self.notes = NotesManager()
         self.plugin_shell = PluginShell()
 
@@ -68,7 +67,7 @@ class SearchEngine:
             return self._config_results()
 
         # Performance mode note
-        perf = self.config.data["performance_mode"]
+        perf = self.config.get_performance_mode()
 
         # Calculator
         if (calc := self.calculator.try_calculate(text)):
@@ -126,7 +125,7 @@ class SearchEngine:
         return results
 
     def _config_results(self):
-        perf = self.config.data["performance_mode"]
+        perf = self.config.get_performance_mode()
         mods = self.config.data["modules"]
         return [
             SearchResult("Toggle Modo Ahorro", f"Actualmente: {'ON' if perf else 'OFF'}",
@@ -138,14 +137,29 @@ class SearchEngine:
         ]
 
     def _toggle_perf(self):
-        new_val = not self.config.data["performance_mode"]
+        new_val = not self.config.get_performance_mode()
         self.config.toggle_performance_mode(new_val)
-        if self.file_indexer:
-            self.file_indexer.pause(new_val)
+        
+        # Synchronize performance mode across all components
         if new_val:
-            # reduce visuals, disable AI usage
-            pass
-        log(f"performance_mode={new_val}")
+            # Enable performance mode: pause indexer, disable AI
+            if self.file_indexer:
+                self.file_indexer.pause(True)
+            if self.ai:
+                # Cleanup AI resources if available
+                # Note: AIAssistant doesn't have explicit cleanup, but we clear the reference
+                self.ai = None
+            # Note: Visual effects are handled in UI layer via config
+            log("performance_mode=ON (indexer paused, AI disabled)")
+        else:
+            # Disable performance mode: resume indexer, re-enable AI
+            if self.file_indexer:
+                self.file_indexer.pause(False)
+                self.file_indexer.start()
+            # Re-enable AI if module is enabled
+            if self.config.get_module_enabled("ai") and not self.ai:
+                self.ai = AIAssistant()
+            log("performance_mode=OFF (indexer resumed, AI enabled)")
 
     def _toggle_module(self, key: str, val: bool):
         self.config.set_module_enabled(key, val)
@@ -166,7 +180,7 @@ class SearchEngine:
 
     def _restart_services(self):
         # Simple reinicio: re-lanzar indexador si aplica
-        if self.file_indexer and not self.config.data["performance_mode"]:
+        if self.file_indexer and not self.config.get_performance_mode():
             self.file_indexer.start()
         log("Servicios reiniciados")
 
