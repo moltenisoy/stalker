@@ -276,3 +276,58 @@ class Storage:
         with self._conn() as conn:
             conn.execute("DELETE FROM apps WHERE alias IS NULL")
             conn.commit()
+    
+    def add_clip(self, kind: str, content: bytes, metadata: dict = None):
+        """Add a clipboard entry."""
+        now = time.time()
+        metadata_json = json.dumps(metadata) if metadata else "{}"
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO clipboard(kind, content, metadata, created_at) VALUES (?, ?, ?, ?)",
+                (kind, content, metadata_json, now)
+            )
+            conn.commit()
+    
+    def list_clips(self, q: str = "", limit: int = 50):
+        """List clipboard entries."""
+        sql = "SELECT * FROM clipboard"
+        args = []
+        if q:
+            # Search is limited since content is BLOB, but we can search in kind
+            sql += " WHERE kind LIKE ?"
+            args.append(f"%{q}%")
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        args.append(limit)
+        conn = self._conn()
+        conn.row_factory = sqlite3.Row
+        return conn.execute(sql, args).fetchall()
+    
+    def list_snippets(self, q: str = "", limit: int = 50):
+        """List snippets."""
+        sql = "SELECT * FROM snippets"
+        args = []
+        if q:
+            sql += " WHERE name LIKE ? OR trigger LIKE ? OR body LIKE ?"
+            args.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        args.append(limit)
+        conn = self._conn()
+        conn.row_factory = sqlite3.Row
+        return conn.execute(sql, args).fetchall()
+    
+    def get_snippet_by_trigger(self, trigger: str):
+        """Get a snippet by its trigger."""
+        conn = self._conn()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM snippets WHERE trigger=?", (trigger,)).fetchone()
+        return dict(row) if row else None
+    
+    def add_quicklink(self, name: str, target: str, kind: str, category: str = "", args: str = "", icon: str = "", hotkey: str = None):
+        """Add a quicklink entry."""
+        now = time.time()
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO quicklinks(name, target, kind, category, args, icon, hotkey, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, target, kind, category, args, icon, hotkey, now)
+            )
+            conn.commit()
