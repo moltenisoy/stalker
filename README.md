@@ -257,6 +257,10 @@ certutil -hashfile Stalker.exe MD5
 - [Icon Guide](ICON_GUIDE.md) - Creating custom icons
 - [Changelog](CHANGELOG.md) - Version history and changes
 
+### Project Improvements
+- [Improvements and Suggestions](IMPROVEMENTS_AND_SUGGESTIONS.md) - Code improvements and feature suggestions (English)
+- [Mejoras y Sugerencias](MEJORAS_Y_SUGERENCIAS.md) - Mejoras de código y sugerencias de características (Español)
+
 ### Detailed Documentation
 Available in the `docs/` directory:
 
