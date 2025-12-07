@@ -21,8 +21,11 @@ class NotesManager:
     def __init__(self, storage: Optional[Storage] = None):
         self.storage = storage or Storage()
 
-    def create(self, title: str, body: str, tags: str = "") -> Note:
-        return self.storage.add_note(title, body, tags)
+    def create(self, title: str, body: str, tags: str = ""):
+        """Create a new note and return confirmation."""
+        self.storage.add_note(title, body, tags)
+        # Note: storage.add_note doesn't return the note, so we just log success
+        return True
 
     def update(self, note_id: int, title: Optional[str] = None, body: Optional[str] = None, tags: Optional[str] = None):
         self.storage.update_note(note_id, title=title, body=body, tags=tags)
