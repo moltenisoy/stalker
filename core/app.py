@@ -112,11 +112,15 @@ class LauncherApp:
     def _on_tray_activated(self, reason):
         """Handle tray icon activation."""
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            # Left click - toggle window
+            # Left click - toggle window visibility
             self.toggle_visibility()
         elif reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            # Double click - show window
-            self.window.center_and_show()
+            # Double click - always show and focus window
+            if not self.window.isVisible():
+                self.window.center_and_show()
+            else:
+                self.window.raise_()
+                self.window.activateWindow()
     
     def _open_settings_from_tray(self):
         """Open settings panel from tray menu."""
@@ -129,16 +133,25 @@ class LauncherApp:
     def quit_application(self):
         """Quit the application gracefully."""
         # Unregister hotkey
-        if self.hotkey:
-            self.hotkey.unregister()
+        try:
+            if self.hotkey:
+                self.hotkey.unregister()
+        except Exception as e:
+            print(f"Error unregistering hotkey: {e}")
         
         # Hide tray icon
-        if self._tray_icon:
-            self._tray_icon.hide()
+        try:
+            if self._tray_icon:
+                self._tray_icon.hide()
+        except Exception as e:
+            print(f"Error hiding tray icon: {e}")
         
         # Close overlay if exists
-        if self._syshealth_overlay:
-            self._syshealth_overlay.close()
+        try:
+            if self._syshealth_overlay:
+                self._syshealth_overlay.close()
+        except Exception as e:
+            print(f"Error closing overlay: {e}")
         
         # Quit application
         self.qt_app.quit()

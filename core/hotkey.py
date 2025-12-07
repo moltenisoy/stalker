@@ -23,8 +23,14 @@ class GlobalHotkey:
             try:
                 keyboard.remove_hotkey(self.hotkey)
                 self._registered = False
-            except Exception:
-                pass  # Ignore errors during unregistration
+            except (KeyError, RuntimeError) as e:
+                # Log the error but don't crash during cleanup
+                import logging
+                logging.debug(f"Error unregistering hotkey {self.hotkey}: {e}")
+            except Exception as e:
+                # Catch any other unexpected errors
+                import logging
+                logging.warning(f"Unexpected error unregistering hotkey {self.hotkey}: {e}")
 
     def _listen(self):
         keyboard.add_hotkey(self.hotkey, self.callback, suppress=False, trigger_on_release=True)
