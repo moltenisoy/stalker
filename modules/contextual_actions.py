@@ -36,7 +36,8 @@ class ContextualActionsManager:
             content = win32clipboard.GetClipboardData()
             win32clipboard.CloseClipboard()
             return content
-        except:
+        except Exception as e:
+            print(f"Error reading clipboard: {e}")
             return ""
     
     def set_clipboard_content(self, text: str):
@@ -300,23 +301,23 @@ class ContextualActionsManager:
     
     def _is_url(self, text: str) -> bool:
         """Check if text is a URL."""
-        url_pattern = r'^https?://[^\s]+'
-        return bool(re.match(url_pattern, text.strip()))
+        from core.patterns import is_url
+        return is_url(text)
     
     def _extract_urls(self, text: str) -> List[str]:
         """Extract URLs from text."""
-        url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-        return re.findall(url_pattern, text)
+        from core.patterns import extract_urls
+        return extract_urls(text)
     
     def _extract_emails(self, text: str) -> List[str]:
         """Extract email addresses from text."""
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        return re.findall(email_pattern, text)
+        from core.patterns import extract_emails
+        return extract_emails(text)
     
     def _extract_numbers(self, text: str) -> List[str]:
         """Extract numbers from text."""
-        number_pattern = r'\b\d+\.?\d*\b'
-        return re.findall(number_pattern, text)
+        from core.patterns import extract_numbers
+        return extract_numbers(text)
     
     def _looks_like_table(self, text: str) -> bool:
         """Check if text looks like a table."""

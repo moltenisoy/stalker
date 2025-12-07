@@ -87,6 +87,8 @@ class FlowCommandExecutor:
         Returns:
             True if execution succeeded
         """
+        from modules.diagnostics import log
+        
         if context is None:
             context = {}
         
@@ -107,12 +109,12 @@ class FlowCommandExecutor:
                     if isinstance(result, dict):
                         variables.update(result)
                 else:
-                    print(f"Unknown action: {step.action}")
+                    log(f"Unknown action: {step.action}")
                     return False
             
             return True
         except Exception as e:
-            print(f"Error executing flow {flow.name}: {e}")
+            log(f"Error executing flow {flow.name}: {e}")
             return False
     
     def _evaluate_condition(self, condition: str, variables: Dict[str, Any]) -> bool:
@@ -259,8 +261,8 @@ class FlowCommandExecutor:
             import re
             result = re.sub(r'\s+', ' ', text).strip()
         elif transform_type == "extract_links":
-            import re
-            urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', text)
+            from core.patterns import extract_urls
+            urls = extract_urls(text)
             result = '\n'.join(urls)
         else:
             result = text

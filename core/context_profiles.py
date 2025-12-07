@@ -307,12 +307,14 @@ class ContextProfileManager:
     
     def _execute_action(self, action: ContextAction):
         """Execute a context action."""
+        from modules.diagnostics import log
+        
         if action.action_type == "command":
             # Execute command (placeholder - would need app-specific implementation)
-            print(f"Executing command: {action.action_data.get('command')}")
+            log(f"Executing command: {action.action_data.get('command')}")
         elif action.action_type == "flow":
             # Execute flow (would integrate with FlowCommands)
-            print(f"Executing flow: {action.action_data.get('flow')}")
+            log(f"Executing flow: {action.action_data.get('flow')}")
         elif action.action_type == "snippet":
             # Paste snippet
             text = action.action_data.get("text", "")

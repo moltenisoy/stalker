@@ -303,10 +303,11 @@ class CompoundActionManager:
     
     def _translate_text(self, text: str = None, target_lang: str = "en", **kwargs):
         """Translate text (placeholder - would integrate with translation service)."""
-        # Placeholder for translation functionality
-        # In a real implementation, this would call a local translation model
-        # or an API if configured
-        return text  # Return as-is for now
+        # TODO: Integrate with translation service (Google Translate API, DeepL, or local model)
+        # For now, return text with a marker indicating translation is not implemented
+        from modules.diagnostics import log
+        log("Translation not yet implemented - returning original text")
+        return f"[Translation pending: {text}]"
     
     def _paste_text(self, text: str = None, **kwargs):
         """Paste text using keystroke."""

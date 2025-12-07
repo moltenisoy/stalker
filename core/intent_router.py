@@ -80,7 +80,9 @@ class IntentRouter:
     ]
     
     CALCULATE_PATTERNS = [
-        (r"[\d+\-*/().\s]+", 0.7),
+        # Match math expressions: numbers, operators, parentheses, spaces
+        # Must have at least one digit and one operator to be valid
+        (r"^\d+[\d+\-*/().\s]*[\d+\-*/()]+[\d+\-*/().\s]*\d+$", 0.7),
         (r"^(calc|calculate|calcula)\s+(.+)", 0.85),
     ]
     
