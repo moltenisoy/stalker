@@ -40,7 +40,9 @@ class SearchEngine:
             self.file_indexer.pause(True)
         self.quicklinks = Quicklinks() if self.config.get_module_enabled("links") else None
         self.macro_recorder = MacroRecorder() if self.config.get_module_enabled("macros") else None
-        self.syshealth = SysHealth() if self.config.get_module_enabled("optimizer") else None
+        self.syshealth = SysHealth(config=self.config) if self.config.get_module_enabled("optimizer") else None
+        if self.syshealth:
+            self.syshealth.start_background_refresh()
         self.ai = AIAssistant() if self.config.get_module_enabled("ai") and not perf else None
         self.notes = NotesManager()
         self.plugin_shell = PluginShell()
@@ -58,6 +60,7 @@ class SearchEngine:
             SearchResult("/links", "Accesos directos personalizados", group="command"),
             SearchResult("/macros", "Macros grabadas", group="command"),
             SearchResult("/syshealth", "Monitor de sistema y procesos", group="command"),
+            SearchResult("/overlay", "Toggle system health overlay", group="command"),
             SearchResult("/ai", "Asistente de IA (cloud/local) o '>'", group="command"),
             SearchResult("/notes", "Notas markdown seguras", group="command"),
             SearchResult(">config", "Panel de configuración profunda", group="command"),
@@ -137,6 +140,7 @@ class SearchEngine:
         is_links = qlow.startswith("/links") or qlow.startswith("/link")
         is_macro = qlow.startswith("/macros") or qlow.startswith("/macro")
         is_sys = qlow.startswith("/syshealth") or qlow.startswith("/sys")
+        is_overlay = qlow.startswith("/overlay")
 
         if is_ai and self.ai:
             prompt = text[1:] if qlow.startswith(">") else text.replace("/ai", "").strip()
@@ -174,10 +178,18 @@ class SearchEngine:
         if is_macro and self.macro_recorder:
             results += self.macro_recorder.search_macros(text.replace("/macros", "").replace("/macro", "").strip(), limit=30)
         if is_sys and self.syshealth:
-            results += self._syshealth_results()
+            qsys = text.replace("/syshealth", "").replace("/sys", "").strip()
+            results += self._syshealth_results(qsys)
+        if is_overlay:
+            results.append(SearchResult(
+                title="Toggle System Health Overlay",
+                subtitle="Show/hide persistent CPU/RAM/Disk/Net monitor",
+                action=self._toggle_overlay,
+                group="command",
+            ))
 
         # default search - search apps and other modules
-        if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys]):
+        if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys, is_overlay]):
             # Add internal commands
             results += [r for r in self.internal_commands if qlow in r.title.lower()]
             
@@ -336,16 +348,106 @@ class SearchEngine:
         except Exception as e:
             log(f"Error copying path to clipboard: {e}")
 
-    def _syshealth_results(self):
+    def _syshealth_results(self, query: str = ""):
+        """Return syshealth results including system info, processes, and system tools."""
+        results = []
+        
+        # System snapshot header
         snap = self.syshealth.snapshot()
         header = SearchResult(
             title=f"CPU {snap.cpu_percent:.0f}% | RAM {snap.ram_used_gb:.1f}/{snap.ram_total_gb:.1f} GB | "
                   f"Disk {snap.disk_read_mb_s:.1f}R/{snap.disk_write_mb_s:.1f}W | "
                   f"Net {snap.net_down_mb_s:.1f}↓/{snap.net_up_mb_s:.1f}↑ MB/s",
-            subtitle="Monitor en tiempo real (/syshealth)",
+            subtitle="Monitor en tiempo real • Ctrl+W para terminar proceso",
             group="syshealth",
         )
-        return [header]
+        results.append(header)
+        
+        # System tool shortcuts
+        qlow = query.lower()
+        
+        # Show system tools based on query or show all if no specific query
+        tools = []
+        if not qlow or "task" in qlow or "admin" in qlow:
+            tools.append(SearchResult(
+                title="🖥️ Task Manager",
+                subtitle="Administrador de tareas de Windows",
+                action=lambda: self._show_tool_feedback(self.syshealth.open_task_manager()),
+                group="syshealth",
+            ))
+        
+        if not qlow or "startup" in qlow or "inicio" in qlow:
+            tools.append(SearchResult(
+                title="🚀 Startup Apps",
+                subtitle="Aplicaciones de inicio de Windows",
+                action=lambda: self._show_tool_feedback(self.syshealth.open_startup_apps()),
+                group="syshealth",
+            ))
+        
+        if not qlow or "defrag" in qlow or "disco" in qlow:
+            tools.append(SearchResult(
+                title="💿 Defragmentador de Disco",
+                subtitle="Optimizar y desfragmentar unidades",
+                action=lambda: self._show_tool_feedback(self.syshealth.open_defragmenter()),
+                group="syshealth",
+            ))
+        
+        if not qlow or "resource" in qlow or "monitor" in qlow:
+            tools.append(SearchResult(
+                title="📊 Monitor de Recursos",
+                subtitle="Monitor detallado de recursos del sistema",
+                action=lambda: self._show_tool_feedback(self.syshealth.open_resource_monitor()),
+                group="syshealth",
+            ))
+        
+        if not qlow or "info" in qlow or "system" in qlow:
+            tools.append(SearchResult(
+                title="ℹ️ Información del Sistema",
+                subtitle="Información detallada del hardware y software",
+                action=lambda: self._show_tool_feedback(self.syshealth.open_system_info()),
+                group="syshealth",
+            ))
+        
+        results.extend(tools)
+        
+        # Top processes - determine sort order from query
+        sort_by = "ram" if "ram" in qlow or "memoria" in qlow else "cpu"
+        limit = self.config.get_syshealth_config("process_limit") if self.config else 15
+        procs = self.syshealth.top_procs(by=sort_by, limit=limit, use_cache=True)
+        
+        for proc in procs:
+            results.append(SearchResult(
+                title=f"{proc.name} (PID {proc.pid})",
+                subtitle=f"CPU {proc.cpu:.1f}% • RAM {proc.ram_mb:.0f} MB • {proc.username}",
+                action=lambda p=proc.pid: self._kill_process_with_confirmation(p),
+                group="process",
+                meta={"pid": proc.pid, "name": proc.name},
+            ))
+        
+        return results
+    
+    def _show_tool_feedback(self, result: tuple):
+        """Show feedback for system tool launch."""
+        success, message = result
+        from modules.diagnostics import log
+        if success:
+            log(f"✓ {message}")
+        else:
+            log(f"✗ {message}")
+    
+    def _kill_process_with_confirmation(self, pid: int):
+        """Kill process with optional confirmation."""
+        # This will be called from launcher which will handle confirmation
+        # The actual kill is done in launcher.py with Ctrl+W
+        from modules.diagnostics import log
+        log(f"Use Ctrl+W para terminar proceso con PID {pid}")
+    
+    def _toggle_overlay(self):
+        """Toggle system health overlay."""
+        if hasattr(self, '_app_ref') and self._app_ref:
+            self._app_ref.toggle_syshealth_overlay()
+        from modules.diagnostics import log
+        log("Toggling system health overlay")
 
     def _apply_scoring(self, results: List[SearchResult], query: str) -> List[SearchResult]:
         """Apply scoring and prioritization to search results."""
