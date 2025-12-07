@@ -41,6 +41,9 @@ class SearchEngine:
         self.ai = AIAssistant() if self.config.get_module_enabled("ai") and not perf else None
         self.notes = NotesManager()
         self.plugin_shell = PluginShell()
+        
+        # AI response panel (lazy initialization)
+        self._ai_response_panel = None
 
         if self.file_indexer and not perf:
             self.file_indexer.start()
@@ -56,6 +59,49 @@ class SearchEngine:
             SearchResult("/notes", "Notas markdown seguras", group="command"),
             SearchResult(">config", "Panel de configuración profunda", group="command"),
         ]
+    
+    def _get_ai_panel(self):
+        """Lazy initialization of AI response panel."""
+        if self._ai_response_panel is None:
+            from ui.ai_response_panel import AIResponsePanel
+            self._ai_response_panel = AIResponsePanel()
+            # Connect signal to create note from AI response
+            self._ai_response_panel.insert_to_note_signal.connect(self._create_note_from_text)
+        return self._ai_response_panel
+    
+    def _create_note_from_text(self, text: str):
+        """Create a new note from the given text."""
+        title = text[:50] if len(text) > 50 else text
+        if '\n' in title:
+            title = title.split('\n')[0]
+        self.notes.create(title=title.strip() or "Nota de IA", body=text, tags="ia")
+        log(f"Note created from AI response: {title}")
+    
+    def _insert_clipboard_to_note(self):
+        """Create a note from clipboard content."""
+        import win32clipboard
+        try:
+            win32clipboard.OpenClipboard()
+            text = win32clipboard.GetClipboardData()
+        except Exception as ex:
+            log(f"Error reading clipboard: {ex}")
+            return
+        finally:
+            try:
+                win32clipboard.CloseClipboard()
+            except:
+                pass
+        
+        if not text or not text.strip():
+            log("Clipboard is empty, cannot create note")
+            return
+        
+        # Create note from clipboard content
+        title = text[:50] if len(text) > 50 else text
+        if '\n' in title:
+            title = title.split('\n')[0]
+        self.notes.create(title=title.strip() or "Nota desde portapapeles", body=text, tags="clipboard")
+        log(f"Note created from clipboard: {title}")
 
     def search(self, query: str) -> List[SearchResult]:
         text = query.strip()
@@ -91,12 +137,13 @@ class SearchEngine:
 
         if is_ai and self.ai:
             prompt = text[1:] if qlow.startswith(">") else text.replace("/ai", "").strip()
-            results.append(SearchResult(
-                title=f"Preguntar IA: {prompt[:64]}",
-                subtitle="Cloud/Local BYOK",
-                action=lambda p=prompt: log(self.ai.ask(p)),
-                group="ai",
-            ))
+            if prompt:  # Only show if there's a prompt
+                results.append(SearchResult(
+                    title=f"Preguntar IA: {prompt[:64]}",
+                    subtitle="Cloud/Local BYOK - Enter para ejecutar",
+                    action=lambda p=prompt: self._show_ai_response(p),
+                    group="ai",
+                ))
         elif is_ai and perf:
             results.append(SearchResult(title="IA desactivada en Modo Ahorro", group="ai"))
 
@@ -106,6 +153,13 @@ class SearchEngine:
                 results.append(SearchResult(title=n.title, subtitle=n.body[:80], copy_text=n.body, group="note"))
             results.append(SearchResult(title="Crear nota rápida", subtitle=qnotes or "Sin título",
                                         action=lambda t=qnotes: self.notes.create(t or "Sin título", "", ""), group="note"))
+            # Add option to insert clipboard content into a note
+            results.append(SearchResult(
+                title="📋 Insertar selección en nota",
+                subtitle="Crear nota con el contenido del portapapeles",
+                action=self._insert_clipboard_to_note,
+                group="note"
+            ))
         if is_clip and self.clipboard_mgr:
             results += self._clipboard_results(text.replace("/clipboard", "").replace("/clip", "").strip())
         if is_snip and self.snippet_mgr:
@@ -150,6 +204,21 @@ class SearchEngine:
         self._settings_panel.raise_()
         self._settings_panel.activateWindow()
         log("Settings panel opened")
+    
+    def _show_ai_response(self, prompt: str):
+        """Execute AI query and show response in panel."""
+        if not self.ai:
+            return
+        
+        # Get AI response
+        response, success = self.ai.ask(prompt)
+        
+        # Show in panel
+        panel = self._get_ai_panel()
+        panel.show_response(response, is_error=not success)
+        
+        # Log the interaction
+        log(f"AI query: {prompt[:100]} | Success: {success}")
 
     def _toggle_perf(self):
         new_val = not self.config.get_performance_mode()
