@@ -140,7 +140,7 @@ class SearchEngine:
         from ui.settings_panel import SettingsPanel
         
         # Create settings panel (we keep a reference to prevent garbage collection)
-        if not hasattr(self, '_settings_panel') or self._settings_panel is None:
+        if not hasattr(self, '_settings_panel'):
             # Try to get app reference from window if available
             app_ref = getattr(self, '_app_ref', None)
             self._settings_panel = SettingsPanel(config=self.config, app_ref=app_ref)

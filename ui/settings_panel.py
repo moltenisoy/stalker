@@ -334,9 +334,10 @@ class SettingsPanel(QWidget):
         msg.exec()
     
     def _show_error(self, title: str, error: Exception):
-        """Show error message with traceback."""
+        """Show error message with traceback logged."""
         error_msg = f"{str(error)}\n\n{traceback.format_exc()}"
-        print(f"Error: {error_msg}")
+        print(f"Error: {error_msg}")  # Log full traceback
+        # Only show user-friendly error message, not full traceback
         self._show_message(title, str(error), QMessageBox.Critical)
     
     # Event Handlers
@@ -397,9 +398,29 @@ class SettingsPanel(QWidget):
     def _on_accent_change(self):
         """Handle accent color change."""
         try:
+            from PySide6.QtGui import QColor
+            import re
+            
             accent = self.accent_input.text().strip()
-            if not accent.startswith("#"):
-                self._show_message("Error", "El color debe empezar con # (ej: #3a86ff)", QMessageBox.Warning)
+            
+            # Validate hex color format
+            hex_pattern = re.compile(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$')
+            if not hex_pattern.match(accent):
+                self._show_message(
+                    "Error",
+                    "El color debe ser un código hex válido (ej: #3a86ff o #f00)",
+                    QMessageBox.Warning
+                )
+                return
+            
+            # Additional validation using QColor
+            color = QColor(accent)
+            if not color.isValid():
+                self._show_message(
+                    "Error",
+                    "El color especificado no es válido",
+                    QMessageBox.Warning
+                )
                 return
             
             self.config.set_ui(accent=accent)
@@ -530,10 +551,12 @@ class SettingsPanel(QWidget):
                     message_parts.append(f"{symbol} {service_name} ({status})")
                 
                 # Apply theme changes
-                if self.app_ref:
+                if self.app_ref and hasattr(self.app_ref, '_apply_theme'):
                     theme = self.config.get_ui("theme")
                     self.app_ref._apply_theme(dark=(theme == "dark"))
                     message_parts.append("\n✓ Tema aplicado")
+                else:
+                    message_parts.append("\n⚠ Tema: Requiere reinicio de la aplicación")
                 
                 # Re-register hotkey if changed
                 if self.app_ref and hasattr(self.app_ref, 'hotkey'):
