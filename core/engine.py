@@ -125,16 +125,31 @@ class SearchEngine:
         return results
 
     def _config_results(self):
-        perf = self.config.get_performance_mode()
-        mods = self.config.data["modules"]
+        """Return result to open settings panel."""
         return [
-            SearchResult("Toggle Modo Ahorro", f"Actualmente: {'ON' if perf else 'OFF'}",
-                         action=lambda: self._toggle_perf(), group="config"),
-            SearchResult("Exportar configuración", "Export JSON", action=self._export_config, group="config"),
-            SearchResult("Importar configuración", "Import JSON (ruta fija)", action=self._import_config, group="config"),
-            SearchResult("Reiniciar servicios", "Reinicia indexador/IA/monitor", action=self._restart_services, group="config"),
-            *[SearchResult(f"Modulo {k}", f"{'ON' if v else 'OFF'}", action=lambda key=k, val=not mods[k]: self._toggle_module(key, val), group="config") for k, v in mods.items()],
+            SearchResult(
+                "Abrir Panel de Configuración",
+                "Gestiona hotkey, tema, módulos, rendimiento y más",
+                action=self._open_settings_panel,
+                group="config"
+            ),
         ]
+    
+    def _open_settings_panel(self):
+        """Open the settings panel UI."""
+        from ui.settings_panel import SettingsPanel
+        
+        # Create settings panel (we keep a reference to prevent garbage collection)
+        if not hasattr(self, '_settings_panel') or self._settings_panel is None:
+            # Try to get app reference from window if available
+            app_ref = getattr(self, '_app_ref', None)
+            self._settings_panel = SettingsPanel(config=self.config, app_ref=app_ref)
+        
+        # Show and raise the panel
+        self._settings_panel.show()
+        self._settings_panel.raise_()
+        self._settings_panel.activateWindow()
+        log("Settings panel opened")
 
     def _toggle_perf(self):
         new_val = not self.config.get_performance_mode()

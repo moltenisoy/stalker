@@ -4,14 +4,14 @@ from core.engine import SearchEngine, SearchResult
 class PredictiveSearch(QObject):
     results_ready = Signal(list)
 
-    def __init__(self, debounce_ms=300):
+    def __init__(self, debounce_ms=300, config=None):
         super().__init__()
         self.debounce_ms = debounce_ms
         self._timer = QTimer()
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._emit_results)
         self._pending_query = ""
-        self.engine = SearchEngine()
+        self.engine = SearchEngine(config=config)
 
     def query(self, text: str):
         self._pending_query = text
