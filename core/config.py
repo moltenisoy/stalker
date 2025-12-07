@@ -1,9 +1,44 @@
 import json
 import copy
+import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 CONFIG_PATH = Path.home() / ".fastlauncher" / "config.json"
+
+
+def _get_bundled_config_path() -> Path:
+    """Get the path to the bundled default config file."""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller executable
+        bundle_dir = Path(sys._MEIPASS)
+    else:
+        # Running as script
+        bundle_dir = Path(__file__).parent.parent
+    
+    return bundle_dir / "config.default.json"
+
+
+def _copy_default_config_on_first_run():
+    """Copy the default config to user home on first run."""
+    if CONFIG_PATH.exists():
+        return  # Config already exists
+    
+    default_config_path = _get_bundled_config_path()
+    
+    if default_config_path.exists():
+        try:
+            # Ensure config directory exists
+            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Copy default config
+            import shutil
+            shutil.copy2(default_config_path, CONFIG_PATH)
+            print(f"First run: Copied default config to {CONFIG_PATH}")
+        except Exception as e:
+            print(f"Warning: Could not copy default config: {e}")
+    else:
+        print(f"Warning: Default config not found at {default_config_path}")
 
 _DEFAULTS: Dict[str, Any] = {
     "ui": {
@@ -124,6 +159,8 @@ class ConfigManager:
     def __init__(self, path: Path = CONFIG_PATH):
         self.path = path
         self.data = copy.deepcopy(_DEFAULTS)
+        # Copy default config on first run if it doesn't exist
+        _copy_default_config_on_first_run()
         self._ensure_config_dir()
         self.load()
 
