@@ -12,13 +12,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def test_calculate_checksum():
     """Test checksum calculation."""
+    import tempfile
     from build_exe import calculate_checksum
     
-    # Create a temporary test file
-    test_file = Path("/tmp/test_checksum.txt")
+    # Create a temporary test file using cross-platform method
     test_content = b"Hello, World!"
     
-    test_file.write_bytes(test_content)
+    with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp:
+        tmp.write(test_content)
+        test_file = Path(tmp.name)
     
     try:
         # Calculate checksums

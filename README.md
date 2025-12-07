@@ -226,6 +226,12 @@ The build process creates:
 - `dist/Stalker.exe.checksums.txt` - SHA-256 and MD5 checksums
 - `dist/BUILD_INFO.txt` - Build information and requirements
 
+### Verify Build
+```bash
+# Verify build artifacts and checksums
+python verify_build.py
+```
+
 ### Verifying Checksums
 
 #### Windows PowerShell
@@ -245,7 +251,14 @@ certutil -hashfile Stalker.exe MD5
 
 ## 📖 Documentation
 
-Detailed documentation is available in the `docs/` directory:
+### Getting Started
+- [Quick Start Guide](QUICKSTART.md) - Get up and running in 5 minutes
+- [Build Guide](BUILD.md) - Detailed build instructions
+- [Icon Guide](ICON_GUIDE.md) - Creating custom icons
+- [Changelog](CHANGELOG.md) - Version history and changes
+
+### Detailed Documentation
+Available in the `docs/` directory:
 
 - [API Reference](docs/API_REFERENCE.md)
 - [Comprehensive Documentation](docs/COMPREHENSIVE_DOCUMENTATION.md)

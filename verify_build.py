@@ -26,9 +26,13 @@ def calculate_checksum(filepath, algorithm='sha256'):
 
 def verify_build():
     """Verify the build artifacts."""
+    import platform
+    
     dist_dir = Path('dist')
-    exe_file = dist_dir / 'Stalker.exe'
-    checksum_file = dist_dir / 'Stalker.exe.checksums.txt'
+    # Use platform-appropriate executable extension
+    exe_name = 'Stalker.exe' if platform.system() == 'Windows' else 'Stalker'
+    exe_file = dist_dir / exe_name
+    checksum_file = dist_dir / f'{exe_name}.checksums.txt'
     build_info_file = dist_dir / 'BUILD_INFO.txt'
     
     print("=" * 60)

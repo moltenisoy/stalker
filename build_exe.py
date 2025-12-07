@@ -59,6 +59,10 @@ def build_executable(icon_path=None):
     version = get_version()
     print(f"Version: {version}")
     
+    # Determine path separator for PyInstaller's --add-data
+    # PyInstaller uses ; on Windows, : on Unix-like systems
+    path_sep = ';' if os.name == 'nt' else ':'
+    
     # Base PyInstaller command
     cmd = [
         'pyinstaller',
@@ -76,8 +80,8 @@ def build_executable(icon_path=None):
         # Add hooks directory
         '--additional-hooks-dir', 'hooks',
         
-        # Add data files
-        '--add-data', 'config.default.json;.',
+        # Add data files (use platform-appropriate path separator)
+        '--add-data', f'config.default.json{path_sep}.',
         
         # Hidden imports that might be needed
         '--hidden-import', 'PySide6.QtCore',
