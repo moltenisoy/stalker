@@ -3,6 +3,8 @@ from ctypes import wintypes
 import win32con
 import win32gui
 import win32api
+import win32process
+from typing import Dict, Optional
 
 SPI_GETWORKAREA = 0x0030
 
@@ -13,6 +15,90 @@ def _get_work_area():
 
 def _get_foreground_hwnd():
     return win32gui.GetForegroundWindow()
+
+def get_active_window_info() -> Dict[str, str]:
+    """
+    Get information about the currently active window.
+    
+    Returns:
+        Dictionary with window title, class, and process name
+    """
+    try:
+        hwnd = win32gui.GetForegroundWindow()
+        
+        # Get window title
+        title = win32gui.GetWindowText(hwnd)
+        
+        # Get window class
+        window_class = win32gui.GetClassName(hwnd)
+        
+        # Get process name
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        try:
+            import psutil
+            process = psutil.Process(pid)
+            process_name = process.name()
+        except:
+            process_name = ""
+        
+        return {
+            "hwnd": hwnd,
+            "title": title,
+            "class": window_class,
+            "process": process_name,
+            "pid": pid
+        }
+    except Exception as e:
+        print(f"Error getting active window info: {e}")
+        return {
+            "hwnd": 0,
+            "title": "",
+            "class": "",
+            "process": "",
+            "pid": 0
+        }
+
+def detect_app_context() -> Optional[str]:
+    """
+    Detect the current application context based on active window.
+    
+    Returns:
+        App context identifier (e.g., 'vscode', 'browser', 'explorer') or None
+    """
+    info = get_active_window_info()
+    title = info["title"].lower()
+    process = info["process"].lower()
+    window_class = info["class"].lower()
+    
+    # VSCode detection
+    if "visual studio code" in title or "code.exe" in process:
+        return "vscode"
+    
+    # Browser detection
+    if any(browser in process for browser in ["chrome.exe", "firefox.exe", "msedge.exe"]):
+        return "browser"
+    
+    # File Explorer detection
+    if "explorer.exe" in process and "cabinetw" in window_class:
+        return "explorer"
+    
+    # Figma detection
+    if "figma" in title.lower():
+        return "figma"
+    
+    # Terminal detection
+    if any(term in process for term in ["cmd.exe", "powershell.exe", "windowsterminal.exe"]):
+        return "terminal"
+    
+    # Office apps
+    if "winword.exe" in process:
+        return "word"
+    if "excel.exe" in process:
+        return "excel"
+    if "powerpnt.exe" in process:
+        return "powerpoint"
+    
+    return None
 
 def _get_monitor_info_from_hwnd(hwnd):
     monitor = win32api.MonitorFromWindow(hwnd, win32con.MONITOR_DEFAULTTONEAREST)

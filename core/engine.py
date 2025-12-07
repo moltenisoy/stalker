@@ -15,6 +15,12 @@ from modules.ai_assistant import AIAssistant
 from modules.notes import NotesManager
 from modules.plugin_shell import PluginShell
 from modules.diagnostics import log
+from core.intent_router import IntentRouter, IntentType
+from core.compound_actions import CompoundActionManager
+from core.context_profiles import ContextProfileManager
+from core.flow_commands import FlowCommandManager
+from modules.contextual_actions import ContextualActionsManager
+from modules.window_manager import get_active_window_info, detect_app_context
 
 @dataclass
 class SearchResult:
@@ -47,6 +53,13 @@ class SearchEngine:
         self.notes = NotesManager()
         self.plugin_shell = PluginShell()
         
+        # New features - Intent Router and Context
+        self.intent_router = IntentRouter()
+        self.compound_actions = CompoundActionManager()
+        self.context_profiles = ContextProfileManager()
+        self.flow_commands = FlowCommandManager()
+        self.contextual_actions = ContextualActionsManager()
+        
         # AI response panel (lazy initialization)
         self._ai_response_panel = None
 
@@ -63,6 +76,8 @@ class SearchEngine:
             SearchResult("/overlay", "Toggle system health overlay", group="command"),
             SearchResult("/ai", "Asistente de IA (cloud/local) o '>'", group="command"),
             SearchResult("/notes", "Notas markdown seguras", group="command"),
+            SearchResult("/context", "Acciones contextuales para app activa", group="command"),
+            SearchResult("/actions", "Acciones rápidas sobre portapapeles", group="command"),
             SearchResult(">config", "Panel de configuración profunda", group="command"),
         ]
     
@@ -141,6 +156,8 @@ class SearchEngine:
         is_macro = qlow.startswith("/macros") or qlow.startswith("/macro")
         is_sys = qlow.startswith("/syshealth") or qlow.startswith("/sys")
         is_overlay = qlow.startswith("/overlay")
+        is_context = qlow.startswith("/context")
+        is_actions = qlow.startswith("/actions")
 
         if is_ai and self.ai:
             prompt = text[1:] if qlow.startswith(">") else text.replace("/ai", "").strip()
@@ -187,9 +204,26 @@ class SearchEngine:
                 action=self._toggle_overlay,
                 group="command",
             ))
+        
+        # NEW: Context-aware actions
+        if is_context:
+            results += self._context_results()
+        
+        # NEW: Contextual actions on clipboard
+        if is_actions:
+            qactions = text.replace("/actions", "").strip()
+            results += self.contextual_actions.get_available_actions(qactions)
+
+        # NEW: Intent-based suggestions (when not in command mode)
+        if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys, is_overlay, is_context, is_actions]):
+            # Detect intent and suggest compound actions
+            if text and len(text) > 2:
+                intent = self.intent_router.detect_intent(text)
+                if intent.confidence > 0.7:
+                    results += self._intent_suggestions(intent)
 
         # default search - search apps and other modules
-        if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys, is_overlay]):
+        if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys, is_overlay, is_context, is_actions]):
             # Add internal commands
             results += [r for r in self.internal_commands if qlow in r.title.lower()]
             
@@ -448,6 +482,98 @@ class SearchEngine:
             self._app_ref.toggle_syshealth_overlay()
         from modules.diagnostics import log
         log("Toggling system health overlay")
+    
+    def _context_results(self) -> List[SearchResult]:
+        """Return context-aware actions based on active window."""
+        results = []
+        
+        # Detect current app context
+        app_context = detect_app_context()
+        window_info = get_active_window_info()
+        
+        # Add header showing active app
+        app_name = app_context or window_info.get("process", "Unknown")
+        results.append(SearchResult(
+            title=f"🎯 Contexto: {app_name}",
+            subtitle=f"Ventana activa: {window_info.get('title', '')[:60]}",
+            group="context"
+        ))
+        
+        # Get profile for current app
+        profile = None
+        if app_context:
+            profile = self.context_profiles.get_profile(app_context)
+        
+        if not profile:
+            # Try to match by window title and class
+            profile = self.context_profiles.get_profile_for_window(
+                window_info.get("title", ""),
+                window_info.get("class", "")
+            )
+        
+        if profile:
+            # Add profile actions
+            results += self.context_profiles.get_actions_for_profile(profile)
+            # Add profile snippets
+            results += self.context_profiles.get_snippets_for_profile(profile)
+        
+        # Add flow commands for this context
+        if app_context:
+            flows = self.flow_commands.get_flows_for_app(app_context)
+            for flow in flows:
+                results.append(SearchResult(
+                    title=f"⚡ {flow.name}",
+                    subtitle=flow.description,
+                    action=lambda f=flow.name: self.flow_commands.execute_flow(f),
+                    group="flow"
+                ))
+        
+        # Add contextual actions on clipboard
+        results += self.contextual_actions.get_available_actions()
+        
+        return results
+    
+    def _intent_suggestions(self, intent) -> List[SearchResult]:
+        """Suggest actions based on detected intent."""
+        results = []
+        
+        if intent.type == IntentType.SEARCH_FILE:
+            # Suggest compound actions for file operations
+            results.append(SearchResult(
+                title="🔍 Buscar archivo y abrir carpeta",
+                subtitle="Buscar el archivo y abrir su ubicación",
+                group="intent"
+            ))
+        
+        elif intent.type == IntentType.FILE_ACTION:
+            # Suggest file compound actions
+            action = intent.params.get("action", "")
+            if action in ["zip", "compress"]:
+                results.append(SearchResult(
+                    title="🗜️ Comprimir y Compartir",
+                    subtitle="Crear ZIP y copiar ruta al portapapeles",
+                    group="intent"
+                ))
+        
+        elif intent.type == IntentType.TEXT_TRANSFORM:
+            # Suggest transform and paste
+            transform = intent.params.get("transform", "")
+            results.append(SearchResult(
+                title=f"🔄 Transformar y Pegar ({transform})",
+                subtitle="Aplicar transformación y pegar resultado",
+                group="intent"
+            ))
+        
+        elif intent.type == IntentType.TRANSLATE:
+            # Suggest translate and paste
+            results.append(SearchResult(
+                title="🌐 Traducir y Pegar",
+                subtitle="Traducir texto y pegar resultado",
+                action=lambda: self.compound_actions._execute_translate_and_paste(),
+                group="intent"
+            ))
+        
+        return results
 
     def _apply_scoring(self, results: List[SearchResult], query: str) -> List[SearchResult]:
         """Apply scoring and prioritization to search results."""
@@ -455,6 +581,10 @@ class SearchEngine:
         group_weights = {
             "calculator": 100,  # Highest priority
             "app": 90,
+            "context": 88,  # High priority for context actions
+            "compound": 87,
+            "intent": 86,
+            "flow": 85,
             "ai": 85,
             "clipboard": 80,
             "snippet": 75,
