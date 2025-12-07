@@ -9,7 +9,7 @@ class LauncherApp:
     def __init__(self, qt_app):
         self.qt_app = qt_app
         self.config = ConfigManager()
-        self.window = LauncherWindow(config=self.config)
+        self.window = LauncherWindow(config=self.config, app_ref=self)
         
         # Get hotkey from config
         hotkey = self.config.data.get("hotkey", "ctrl+space")

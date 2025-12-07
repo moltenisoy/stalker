@@ -9,7 +9,7 @@ from modules.grid_preview import GridPreview
 from modules.hotkeys_window import WindowHotkeys
 
 class LauncherWindow(QWidget):
-    def __init__(self, config: ConfigManager = None):
+    def __init__(self, config: ConfigManager = None, app_ref=None):
         super().__init__(flags=Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setWindowFlag(Qt.WindowDoesNotAcceptFocus, False)
@@ -18,6 +18,7 @@ class LauncherWindow(QWidget):
 
         # Load configuration
         self.config = config or ConfigManager()
+        self.app_ref = app_ref
         
         # Apply theme from config
         self._apply_theme()
@@ -42,8 +43,11 @@ class LauncherWindow(QWidget):
         layout.addWidget(self.input)
         layout.addWidget(self.list)
 
-        self.search = PredictiveSearch(debounce_ms=250)
+        self.search = PredictiveSearch(debounce_ms=250, config=self.config)
         self.search.results_ready.connect(self.populate_results)
+        # Pass app reference to search engine
+        if self.app_ref:
+            self.search.engine._app_ref = self.app_ref
 
         self.resize(580, 380)
         
