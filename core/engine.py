@@ -1,3 +1,5 @@
+import subprocess
+import win32clipboard
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 from core.config import ConfigManager
@@ -316,7 +318,6 @@ class SearchEngine:
 
     def _open_containing_folder(self, file_path: str):
         """Open the folder containing the specified file."""
-        import subprocess
         try:
             # Use explorer with /select to open and highlight the file
             subprocess.Popen(['explorer', '/select,', file_path])
@@ -326,7 +327,6 @@ class SearchEngine:
 
     def _copy_path_to_clipboard(self, path: str):
         """Copy the file path to clipboard."""
-        import win32clipboard
         try:
             win32clipboard.OpenClipboard()
             win32clipboard.EmptyClipboard()
