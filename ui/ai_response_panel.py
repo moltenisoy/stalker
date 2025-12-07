@@ -4,7 +4,7 @@ Panel de respuesta de IA con soporte para copiar y insertar en notas.
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
                               QPushButton, QLabel, QMessageBox)
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QGuiApplication
 
 
 class AIResponsePanel(QWidget):
@@ -92,7 +92,6 @@ class AIResponsePanel(QWidget):
     
     def _copy_to_clipboard(self):
         """Copy response to clipboard."""
-        from PySide6.QtGui import QGuiApplication
         text = self.response_text.toPlainText()
         if text:
             QGuiApplication.clipboard().setText(text)
