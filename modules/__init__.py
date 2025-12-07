@@ -1,3 +1,0 @@
-"""
-Modules for Stalker application.
-"""

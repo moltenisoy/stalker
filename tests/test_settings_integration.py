@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Set up Qt to use offscreen platform
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
-from core.config import ConfigManager
-from core.engine import SearchEngine
+from core import ConfigManager
+from core import SearchEngine
 from PySide6.QtWidgets import QApplication
 
 

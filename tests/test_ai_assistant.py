@@ -10,8 +10,8 @@ import os
 # Add parent directory to path to import core modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from modules.ai_assistant import AIAssistant
-from core.storage import Storage
+from modules_ai import AIAssistant
+from core import Storage
 
 
 def test_missing_api_key():

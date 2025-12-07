@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication
-from core.app import LauncherApp
+from core import LauncherApp
 
 def main():
     app = QApplication(sys.argv)

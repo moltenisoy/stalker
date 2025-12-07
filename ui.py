@@ -1,3 +1,315 @@
+"""
+Panel de respuesta de IA con soporte para copiar y insertar en notas.
+"""
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
+                              QPushButton, QLabel, QMessageBox)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QGuiApplication
+
+
+class AIResponsePanel(QWidget):
+    """
+    Panel para mostrar respuestas de IA con opciones para copiar e insertar en notas.
+    """
+    insert_to_note_signal = Signal(str)  # Signal to insert text into a note
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Respuesta de IA")
+        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_DeleteOnClose, False)  # Don't delete when closed
+        
+        # Setup UI
+        self._setup_ui()
+        self.resize(600, 400)
+    
+    def _setup_ui(self):
+        """Initialize the UI components."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(16, 16, 16, 16)
+        
+        # Title label
+        self.title_label = QLabel("Respuesta de IA", self)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        self.title_label.setFont(title_font)
+        layout.addWidget(self.title_label)
+        
+        # Response text area (read-only)
+        self.response_text = QTextEdit(self)
+        self.response_text.setReadOnly(True)
+        self.response_text.setPlaceholderText("La respuesta de IA aparecerá aquí...")
+        layout.addWidget(self.response_text, 1)  # Stretch factor 1
+        
+        # Button layout
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
+        
+        # Copy button
+        self.copy_btn = QPushButton("📋 Copiar", self)
+        self.copy_btn.setToolTip("Copiar respuesta al portapapeles")
+        self.copy_btn.clicked.connect(self._copy_to_clipboard)
+        button_layout.addWidget(self.copy_btn)
+        
+        # Insert to note button
+        self.insert_note_btn = QPushButton("📝 Insertar en Nota", self)
+        self.insert_note_btn.setToolTip("Crear o insertar en una nota")
+        self.insert_note_btn.clicked.connect(self._insert_to_note)
+        button_layout.addWidget(self.insert_note_btn)
+        
+        # Close button
+        self.close_btn = QPushButton("Cerrar", self)
+        self.close_btn.clicked.connect(self.hide)
+        button_layout.addWidget(self.close_btn)
+        
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+    
+    def show_response(self, response: str, is_error: bool = False):
+        """
+        Display AI response in the panel.
+        
+        Args:
+            response: The response text to display
+            is_error: Whether this is an error message
+        """
+        self.response_text.setPlainText(response)
+        
+        # Change styling based on error status
+        if is_error:
+            self.response_text.setStyleSheet("QTextEdit { color: #ff6b6b; }")
+            self.title_label.setText("⚠️ Error de IA")
+        else:
+            self.response_text.setStyleSheet("QTextEdit { color: inherit; }")
+            self.title_label.setText("✅ Respuesta de IA")
+        
+        # Show and raise the panel
+        self.show()
+        self.raise_()
+        self.activateWindow()
+    
+    def _copy_to_clipboard(self):
+        """Copy response to clipboard."""
+        text = self.response_text.toPlainText()
+        if text:
+            QGuiApplication.clipboard().setText(text)
+            QMessageBox.information(self, "Copiado", "Respuesta copiada al portapapeles.")
+    
+    def _insert_to_note(self):
+        """Signal to insert the response into a note."""
+        text = self.response_text.toPlainText()
+        if text:
+            self.insert_to_note_signal.emit(text)
+            QMessageBox.information(
+                self, 
+                "Insertar en Nota", 
+                "El texto se insertará en una nueva nota."
+            )
+
+
+
+
+"""
+Editor minimal de notas en texto plano/Markdown.
+CRÍTICO: Se desactiva el rich-text para evitar conversión de <, >, & a entidades HTML.
+"""
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPlainTextEdit, QPushButton
+from PySide6.QtCore import Qt
+from modules.notes import NotesManager
+
+class NotesEditor(QWidget):
+    def __init__(self, notes: NotesManager | None = None):
+        super().__init__()
+        self.notes = notes or NotesManager()
+        self.setWindowTitle("Notas")
+        layout = QVBoxLayout(self)
+        self.title = QLineEdit(self)
+        self.body = QPlainTextEdit(self)  # plain text => no HTML escaping
+        self.body.setPlaceholderText("Markdown aquí; los caracteres <, >, & se mantienen crudos.")
+        self.save_btn = QPushButton("Guardar", self)
+        layout.addWidget(self.title)
+        layout.addWidget(self.body, 1)
+        layout.addWidget(self.save_btn)
+        self.save_btn.clicked.connect(self.save_note)
+
+    def save_note(self):
+        title = self.title.text().strip() or "Sin título"
+        body = self.body.toPlainText()
+        self.notes.create(title=title, body=body, tags="")
+        self.close()
+
+
+
+"""
+Simple overlay panel for system health monitoring.
+Shows CPU, RAM, Disk, and Network metrics with periodic updates.
+Respects performance mode for update frequency.
+"""
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont
+from typing import Optional
+
+
+class SysHealthOverlay(QWidget):
+    """Lightweight overlay showing system health metrics."""
+    
+    def __init__(self, syshealth, config=None):
+        super().__init__(flags=Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setWindowFlag(Qt.WindowDoesNotAcceptFocus, True)
+        
+        self.syshealth = syshealth
+        self.config = config
+        
+        # Load configuration
+        self._load_config()
+        
+        # Setup UI
+        self._setup_ui()
+        
+        # Setup update timer
+        self._setup_timer()
+        
+        # Position overlay
+        self._position_overlay()
+    
+    def _load_config(self):
+        """Load configuration settings."""
+        if self.config:
+            self._update_interval = self.config.get_syshealth_config("overlay_update_interval")
+            self._position = self.config.get_syshealth_config("overlay_position")
+            self._performance_mode = self.config.get_performance_mode()
+        else:
+            self._update_interval = 5.0
+            self._position = "top-right"
+            self._performance_mode = False
+        
+        # Adjust update interval for performance mode
+        if self._performance_mode:
+            self._update_interval = max(self._update_interval * 2, 10.0)
+    
+    def _setup_ui(self):
+        """Setup UI elements."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(5)
+        
+        # Apply theme
+        self._apply_theme()
+        
+        # Create labels
+        self.cpu_label = QLabel("CPU: ---%")
+        self.ram_label = QLabel("RAM: --- / --- GB")
+        self.disk_label = QLabel("Disk: ---R/---W MB/s")
+        self.net_label = QLabel("Net: ---↓/---↑ MB/s")
+        
+        # Set font
+        font = QFont("Segoe UI", 9)
+        for label in [self.cpu_label, self.ram_label, self.disk_label, self.net_label]:
+            label.setFont(font)
+            layout.addWidget(label)
+        
+        self.setFixedSize(220, 110)
+    
+    def _apply_theme(self):
+        """Apply theme based on config."""
+        if self.config:
+            theme = self.config.get_ui("theme")
+            accent = self.config.get_ui("accent")
+        else:
+            theme = "dark"
+            accent = "#3a86ff"
+        
+        if theme == "dark":
+            bg_color = "rgba(15, 23, 42, 200)"
+            text_color = "#eaeaea"
+            border_color = "#1f2937"
+        else:
+            bg_color = "rgba(245, 247, 251, 220)"
+            text_color = "#0f172a"
+            border_color = "#cbd5e1"
+        
+        stylesheet = f"""
+        QWidget {{
+            background-color: {bg_color};
+            border: 1px solid {border_color};
+            border-radius: 8px;
+            color: {text_color};
+        }}
+        QLabel {{
+            color: {text_color};
+            background: transparent;
+        }}
+        """
+        self.setStyleSheet(stylesheet)
+    
+    def _setup_timer(self):
+        """Setup update timer."""
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._update_metrics)
+        self.timer.start(int(self._update_interval * 1000))
+        
+        # Initial update
+        self._update_metrics()
+    
+    def _update_metrics(self):
+        """Update displayed metrics."""
+        try:
+            snap = self.syshealth.snapshot(use_sampling=True)
+            
+            # Update labels
+            self.cpu_label.setText(f"CPU: {snap.cpu_percent:.0f}%")
+            self.ram_label.setText(f"RAM: {snap.ram_used_gb:.1f} / {snap.ram_total_gb:.1f} GB")
+            self.disk_label.setText(f"Disk: {snap.disk_read_mb_s:.1f}R/{snap.disk_write_mb_s:.1f}W MB/s")
+            self.net_label.setText(f"Net: {snap.net_down_mb_s:.1f}↓/{snap.net_up_mb_s:.1f}↑ MB/s")
+        except Exception as e:
+            print(f"Error updating overlay metrics: {e}")
+    
+    def _position_overlay(self):
+        """Position overlay based on configuration."""
+        screen = self.screen().geometry()
+        margin = 10
+        
+        if self._position == "top-left":
+            x = screen.x() + margin
+            y = screen.y() + margin
+        elif self._position == "top-right":
+            x = screen.x() + screen.width() - self.width() - margin
+            y = screen.y() + margin
+        elif self._position == "bottom-left":
+            x = screen.x() + margin
+            y = screen.y() + screen.height() - self.height() - margin
+        else:  # bottom-right
+            x = screen.x() + screen.width() - self.width() - margin
+            y = screen.y() + screen.height() - self.height() - margin
+        
+        self.move(x, y)
+    
+    def toggle_visibility(self):
+        """Toggle overlay visibility."""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.raise_()
+    
+    def update_config(self, config):
+        """Update configuration and refresh settings."""
+        self.config = config
+        self._load_config()
+        self._apply_theme()
+        self._position_overlay()
+        
+        # Restart timer with new interval
+        self.timer.stop()
+        self.timer.start(int(self._update_interval * 1000))
+
+
+
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QPushButton,
     QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QGroupBox, QMessageBox,
@@ -602,3 +914,306 @@ class SettingsPanel(QWidget):
             
         except Exception as ex:
             print(f"Error refreshing UI: {ex}")
+
+
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QMessageBox
+from PySide6.QtCore import Qt, QEvent
+from PySide6.QtGui import QFont, QCursor, QGuiApplication
+from core.search import PredictiveSearch
+from core.types import SearchResult
+from core.config import ConfigManager
+from modules.keystroke import send_text_ime_safe
+from modules.grid_preview import GridPreview
+from modules.hotkeys_window import WindowHotkeys
+
+class LauncherWindow(QWidget):
+    def __init__(self, config: ConfigManager = None, app_ref=None):
+        super().__init__(flags=Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setWindowFlag(Qt.WindowDoesNotAcceptFocus, False)
+        self.setWindowModality(Qt.NonModal)
+        self.setFocusPolicy(Qt.StrongFocus)
+
+        # Load configuration
+        self.config = config or ConfigManager()
+        self.app_ref = app_ref
+        
+        # Apply theme from config
+        self._apply_theme()
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        self.input = QLineEdit(self)
+        self.input.setPlaceholderText("Apps, /files, /links, /clipboard, /snippets, /macros, /syshealth…")
+        
+        # Apply font from config
+        font_family = self.config.get_ui("font_family")
+        font_size = self.config.get_ui("font_size")
+        self.input.setFont(QFont(font_family, font_size))
+        self.input.textChanged.connect(self.on_text_changed)
+        self.input.installEventFilter(self)
+
+        self.list = QListWidget(self)
+        self.list.setFocusPolicy(Qt.NoFocus)
+
+        layout.addWidget(self.input)
+        layout.addWidget(self.list)
+
+        self.search = PredictiveSearch(debounce_ms=250, config=self.config)
+        self.search.results_ready.connect(self.populate_results)
+        # Pass app reference to search engine
+        if self.app_ref:
+            self.search.engine._app_ref = self.app_ref
+
+        self.resize(580, 380)
+        
+        # Apply opacity from config
+        self._inactive_opacity = self.config.get_ui("opacity_inactive")
+        self._active_opacity = self.config.get_ui("opacity_active")
+        self._set_inactive()
+
+        # Visual grid preview + window hotkeys (disabled if effects are off in performance mode)
+        effects_enabled = self.config.get_ui("effects") and not self.config.get_performance_mode()
+        if effects_enabled:
+            self.grid_preview = GridPreview(cols=2, rows=2)
+            self.win_hotkeys = WindowHotkeys(preview=self.grid_preview)
+            self.win_hotkeys.register()
+        else:
+            self.grid_preview = None
+            self.win_hotkeys = None
+
+    def _apply_theme(self):
+        """Apply theme colors and styles from config."""
+        ui_config = self.config.get_ui()
+        theme = ui_config.get("theme", "dark")
+        accent = ui_config.get("accent", "#3a86ff")
+        effects = ui_config.get("effects", True)
+        performance_mode = self.config.get_performance_mode()
+        
+        # Adjust effects based on performance mode
+        border_radius = "12px" if effects and not performance_mode else "8px"
+        
+        if theme == "dark":
+            bg_color = "rgba(15, 23, 42, 215)"
+            input_bg = "rgba(26, 32, 44, 230)"
+            list_bg = "rgba(17, 24, 39, 230)"
+            text_color = "#eaeaea"
+            border_color = "#1f2937"
+        else:  # light theme
+            bg_color = "rgba(245, 247, 251, 235)"
+            input_bg = "rgba(255, 255, 255, 240)"
+            list_bg = "rgba(242, 244, 247, 240)"
+            text_color = "#0f172a"
+            border_color = "#cbd5e1"
+        
+        stylesheet = f"""
+        QWidget {{ 
+            background-color: {bg_color}; 
+            border-radius: {border_radius}; 
+            color: {text_color}; 
+        }}
+        QLineEdit {{ 
+            padding: 10px 12px; 
+            border: 1px solid {accent}; 
+            border-radius: 8px; 
+            background: {input_bg}; 
+            color: {text_color}; 
+            selection-background-color: {accent}; 
+        }}
+        QListWidget {{ 
+            border: 1px solid {border_color}; 
+            border-radius: 8px; 
+            background: {list_bg}; 
+            outline: none; 
+        }}
+        QListWidget::item {{ 
+            padding: 8px 10px; 
+        }}
+        QListWidget::item:selected {{ 
+            background: {accent}; 
+            color: white; 
+        }}
+        """
+        
+        self.setStyleSheet(stylesheet)
+
+    def center_and_show(self):
+        screen = QCursor.pos()
+        desktop = self.screen().geometry()
+        self.move(
+            desktop.x() + (desktop.width() - self.width()) // 2,
+            desktop.y() + (desktop.height() - self.height()) // 3,
+        )
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.input.setFocus()
+        self._set_active()
+
+    def hideEvent(self, event):
+        self._set_inactive()
+        super().hideEvent(event)
+
+    def focusOutEvent(self, event):
+        self.hide()
+        super().focusOutEvent(event)
+
+    def on_text_changed(self, text: str):
+        self.search.query(text)
+
+    def populate_results(self, results):
+        self.list.clear()
+        for res in results:
+            title = res.title
+            if res.subtitle:
+                title = f"{res.title} — {res.subtitle}"
+            item = QListWidgetItem(title, self.list)
+            item.setData(Qt.UserRole, res)
+        if results:
+            self.list.setCurrentRow(0)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        modifiers = event.modifiers()
+
+        if key in (Qt.Key_Escape,):
+            self.hide(); return
+        if key in (Qt.Key_Down,):
+            row = self.list.currentRow()
+            if row < self.list.count() - 1:
+                self.list.setCurrentRow(row + 1); return
+        if key in (Qt.Key_Up,):
+            row = self.list.currentRow()
+            if row > 0:
+                self.list.setCurrentRow(row - 1); return
+        if key in (Qt.Key_Return, Qt.Key_Enter):
+            self._activate_current(); return
+        if key == Qt.Key_C and modifiers & Qt.ControlModifier:
+            self._copy_current(); return
+        if key == Qt.Key_O and modifiers & Qt.ControlModifier:
+            self._open_folder_current(); return
+        if key == Qt.Key_V and modifiers & Qt.ControlModifier and modifiers & Qt.ShiftModifier:
+            self._paste_plain_current(); return
+        if key == Qt.Key_W and modifiers & Qt.ControlModifier:
+            self._kill_current_if_process(); return
+        super().keyPressEvent(event)
+
+    def _activate_current(self):
+        current = self.list.currentItem()
+        if not current:
+            return
+        res: SearchResult = current.data(Qt.UserRole)
+        if res.action:
+            try:
+                res.action()
+            except Exception as ex:
+                print(f"Error al ejecutar acción: {ex}")
+        if res.copy_text:
+            self._copy_text(res.copy_text)
+        self.hide()
+
+    def _copy_current(self):
+        current = self.list.currentItem()
+        if not current:
+            return
+        res: SearchResult = current.data(Qt.UserRole)
+        if res and res.copy_text:
+            self._copy_text(res.copy_text)
+
+    def _open_folder_current(self):
+        """Open containing folder for the current item (Ctrl+O)."""
+        current = self.list.currentItem()
+        if not current:
+            return
+        res: SearchResult = current.data(Qt.UserRole)
+        # Check if this is a file result with the open folder action
+        if res and res.meta and "open_folder_action" in res.meta:
+            try:
+                res.meta["open_folder_action"]()
+                self.hide()
+            except Exception as ex:
+                print(f"Error opening folder: {ex}")
+
+    def _paste_plain_current(self):
+        current = self.list.currentItem()
+        if not current:
+            return
+        res: SearchResult = current.data(Qt.UserRole)
+        if res and res.copy_text:
+            send_text_ime_safe(res.copy_text)
+            self.hide()
+
+    def _kill_current_if_process(self):
+        """Kill current process with optional confirmation (Ctrl+W)."""
+        current = self.list.currentItem()
+        if not current:
+            return
+        
+        res: SearchResult = current.data(Qt.UserRole)
+        if not res or res.group != "process" or not res.meta or "pid" not in res.meta:
+            return
+        
+        pid = res.meta["pid"]
+        name = res.meta.get("name", "Unknown")
+        
+        # Check if confirmation is enabled
+        confirm_kill = True
+        if self.config:
+            confirm_kill = self.config.get_syshealth_config("confirm_kill")
+        
+        # Show confirmation dialog if enabled
+        if confirm_kill:
+            reply = QMessageBox.question(
+                self,
+                "Confirmar terminación de proceso",
+                f"¿Está seguro de que desea terminar el proceso?\n\n"
+                f"Nombre: {name}\n"
+                f"PID: {pid}\n\n"
+                f"Esta acción no se puede deshacer.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply != QMessageBox.Yes:
+                return
+        
+        # Get syshealth instance from search engine
+        if hasattr(self.search, 'engine') and hasattr(self.search.engine, 'syshealth'):
+            syshealth = self.search.engine.syshealth
+            if syshealth:
+                success, message = syshealth.kill(pid)
+                
+                # Show feedback
+                if success:
+                    QMessageBox.information(self, "Éxito", message)
+                else:
+                    QMessageBox.warning(self, "Error", message)
+                
+                # Hide launcher and refresh results
+                self.hide()
+                if success:
+                    # Trigger refresh of search results
+                    self.on_text_changed(self.input.text())
+            else:
+                QMessageBox.warning(self, "Error", "Módulo SysHealth no disponible")
+        else:
+            QMessageBox.warning(self, "Error", "No se puede acceder al módulo SysHealth")
+
+    def _copy_text(self, text: str):
+        QGuiApplication.clipboard().setText(text)
+
+    def eventFilter(self, obj, event):
+        if obj is self.input and event.type() == QEvent.FocusOut:
+            self.hide()
+        return super().eventFilter(obj, event)
+
+    def _set_inactive(self):
+        self.setWindowOpacity(self._inactive_opacity)
+
+    def _set_active(self):
+        self.setWindowOpacity(self._active_opacity)
+
+
