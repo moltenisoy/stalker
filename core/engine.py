@@ -22,6 +22,7 @@ class SearchResult:
     copy_text: Optional[str] = None
     group: str = "general"
     meta: dict = None
+    score: float = 0.0  # Higher score = higher priority
 
 class SearchEngine:
     def __init__(self, config: Optional[ConfigManager] = None):
@@ -32,7 +33,7 @@ class SearchEngine:
         self.clipboard_mgr = ClipboardManager() if self.config.get_module_enabled("clipboard") else None
         self.snippet_mgr = SnippetManager() if self.config.get_module_enabled("snippets") else None
         self.app_launcher = AppLauncher()
-        self.file_indexer = FileIndexer() if self.config.get_module_enabled("files") else None
+        self.file_indexer = FileIndexer(config=self.config) if self.config.get_module_enabled("files") else None
         if self.file_indexer and perf:
             self.file_indexer.pause(True)
         self.quicklinks = Quicklinks() if self.config.get_module_enabled("links") else None
@@ -173,10 +174,24 @@ class SearchEngine:
         if is_sys and self.syshealth:
             results += self._syshealth_results()
 
-        # default search
+        # default search - search apps and other modules
         if not any([is_ai, is_notes, is_clip, is_snip, is_files, is_links, is_macro, is_sys]):
+            # Add internal commands
             results += [r for r in self.internal_commands if qlow in r.title.lower()]
-        return results
+            
+            # Search apps
+            if self.app_launcher and text:
+                # Check for direct alias match first
+                app_result = self.app_launcher.resolve(text)
+                if app_result:
+                    results.append(app_result)
+                else:
+                    # Search in app database
+                    app_results = self.app_launcher.search(text)
+                    results.extend(app_results)
+        
+        # Apply scoring and sort by priority
+        return self._apply_scoring(results, query)
 
     def _config_results(self):
         """Return result to open settings panel."""
@@ -281,7 +296,45 @@ class SearchEngine:
 
     def _file_results(self, q: str):
         rows = self.file_indexer.search(q=q, limit=60)
-        return [SearchResult(title=r["name"], subtitle=f"{r['drive']} • {r['path']}", copy_text=r["path"], group="file") for r in rows]
+        results = []
+        for r in rows:
+            file_path = r["path"]
+            # Create result with actions for opening folder and copying path
+            result = SearchResult(
+                title=r["name"], 
+                subtitle=f"{r['drive']} • {file_path}", 
+                copy_text=file_path, 
+                group="file",
+                meta={
+                    "path": file_path,
+                    "open_folder_action": lambda p=file_path: self._open_containing_folder(p),
+                    "copy_path_action": lambda p=file_path: self._copy_path_to_clipboard(p),
+                }
+            )
+            results.append(result)
+        return results
+
+    def _open_containing_folder(self, file_path: str):
+        """Open the folder containing the specified file."""
+        import subprocess
+        try:
+            # Use explorer with /select to open and highlight the file
+            subprocess.Popen(['explorer', '/select,', file_path])
+            log(f"Opened folder for: {file_path}")
+        except Exception as e:
+            log(f"Error opening folder for {file_path}: {e}")
+
+    def _copy_path_to_clipboard(self, path: str):
+        """Copy the file path to clipboard."""
+        import win32clipboard
+        try:
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardText(path)
+            win32clipboard.CloseClipboard()
+            log(f"Copied path to clipboard: {path}")
+        except Exception as e:
+            log(f"Error copying path to clipboard: {e}")
 
     def _syshealth_results(self):
         snap = self.syshealth.snapshot()
@@ -293,3 +346,43 @@ class SearchEngine:
             group="syshealth",
         )
         return [header]
+
+    def _apply_scoring(self, results: List[SearchResult], query: str) -> List[SearchResult]:
+        """Apply scoring and prioritization to search results."""
+        # Priority weights by group
+        group_weights = {
+            "calculator": 100,  # Highest priority
+            "app": 90,
+            "ai": 85,
+            "clipboard": 80,
+            "snippet": 75,
+            "note": 70,
+            "quicklink": 65,
+            "file": 60,
+            "command": 50,
+            "macro": 45,
+            "syshealth": 40,
+            "general": 30,
+        }
+        
+        query_lower = query.lower()
+        
+        for result in results:
+            # Base score from group
+            base_score = group_weights.get(result.group, 30)
+            
+            # Bonus for exact or prefix matches
+            title_lower = result.title.lower()
+            if title_lower == query_lower:
+                base_score += 50  # Exact match
+            elif title_lower.startswith(query_lower):
+                base_score += 30  # Prefix match
+            elif query_lower in title_lower:
+                base_score += 10  # Contains match
+            
+            result.score = base_score
+        
+        # Sort by score (descending)
+        results.sort(key=lambda r: r.score, reverse=True)
+        
+        return results
