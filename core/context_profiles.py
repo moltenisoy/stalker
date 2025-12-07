@@ -6,7 +6,7 @@ import json
 import os
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, asdict
-from core.engine import SearchResult
+from core.types import SearchResult
 
 @dataclass
 class ContextAction:

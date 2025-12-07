@@ -1,7 +1,7 @@
 import subprocess
 from typing import List, Optional
 from core.storage import Storage
-from core.engine import SearchResult
+from core.types import SearchResult
 
 class Quicklinks:
     def __init__(self, storage: Optional[Storage] = None):

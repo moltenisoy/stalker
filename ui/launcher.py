@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QLis
 from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QFont, QCursor, QGuiApplication
 from core.search import PredictiveSearch
-from core.engine import SearchResult
+from core.types import SearchResult
 from core.config import ConfigManager
 from modules.keystroke import send_text_ime_safe
 from modules.grid_preview import GridPreview

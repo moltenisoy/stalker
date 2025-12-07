@@ -8,7 +8,7 @@ import shutil
 import subprocess
 from typing import Callable, List, Optional, Dict, Any
 from dataclasses import dataclass
-from core.engine import SearchResult
+from core.types import SearchResult
 
 @dataclass
 class ActionStep:

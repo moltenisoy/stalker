@@ -3,7 +3,7 @@ import subprocess
 from typing import List, Optional
 from pathlib import Path
 from core.storage import Storage
-from core.engine import SearchResult
+from core.types import SearchResult
 from modules.diagnostics import log
 
 COMMON_APPS = {
