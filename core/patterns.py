@@ -5,7 +5,8 @@ Centralized location for common patterns used across modules.
 import re
 
 # URL patterns
-URL_PATTERN = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+# Match http/https URLs with common characters in URLs
+URL_PATTERN = r'http[s]?://(?:[a-zA-Z0-9$\-_.+!*\'(),@&]|(?:%[0-9a-fA-F]{2}))+'
 
 # Email pattern
 EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
