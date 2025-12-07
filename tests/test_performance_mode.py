@@ -18,22 +18,22 @@ def test_performance_mode_config_integration():
         config_path = Path(tmpdir) / "test_config.json"
         config = ConfigManager(path=config_path)
         
-        # Test initial state
-        assert config.data["performance_mode"] is False
-        assert config.data["modules"]["ai"] is True
-        assert config.data["modules"]["files"] is True
+        # Test initial state using getter methods
+        assert config.get_performance_mode() is False
+        assert config.get_module_enabled("ai") is True
+        assert config.get_module_enabled("files") is True
         
         # Enable performance mode
         config.toggle_performance_mode(True)
-        assert config.data["performance_mode"] is True
+        assert config.get_performance_mode() is True
         
         # Verify it persists
         config2 = ConfigManager(path=config_path)
-        assert config2.data["performance_mode"] is True
+        assert config2.get_performance_mode() is True
         
         # Disable performance mode
         config2.toggle_performance_mode(False)
-        assert config2.data["performance_mode"] is False
+        assert config2.get_performance_mode() is False
         
         print("✓ test_performance_mode_config_integration passed")
 

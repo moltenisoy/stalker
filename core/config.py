@@ -253,3 +253,11 @@ class ConfigManager:
         if key is None:
             return self.data.get("ui", copy.deepcopy(_DEFAULTS["ui"]))
         return self.data.get("ui", {}).get(key, _DEFAULTS["ui"].get(key))
+
+    def get_performance_mode(self) -> bool:
+        """Get performance mode status."""
+        return bool(self.data.get("performance_mode", False))
+
+    def get_module_enabled(self, module: str) -> bool:
+        """Check if a module is enabled."""
+        return bool(self.data.get("modules", {}).get(module, _DEFAULTS["modules"].get(module, False)))

@@ -232,6 +232,35 @@ def test_set_hotkey():
         print("✓ test_set_hotkey passed")
 
 
+def test_getter_methods():
+    """Test the getter methods for safe access."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "test_config.json"
+        config = ConfigManager(path=config_path)
+        
+        # Test get_performance_mode
+        assert config.get_performance_mode() is False
+        config.toggle_performance_mode(True)
+        assert config.get_performance_mode() is True
+        
+        # Test get_module_enabled
+        assert config.get_module_enabled("ai") is True
+        config.set_module_enabled("ai", False)
+        assert config.get_module_enabled("ai") is False
+        
+        # Test get_ui
+        assert config.get_ui("theme") == "dark"
+        assert config.get_ui("font_size") == 11
+        
+        # Test get_ui with no key returns all UI config
+        ui_config = config.get_ui()
+        assert isinstance(ui_config, dict)
+        assert "theme" in ui_config
+        assert "font_size" in ui_config
+        
+        print("✓ test_getter_methods passed")
+
+
 if __name__ == "__main__":
     print("Running ConfigManager tests...\n")
     
@@ -244,5 +273,6 @@ if __name__ == "__main__":
     test_corrupt_config_handling()
     test_export_import()
     test_set_hotkey()
+    test_getter_methods()
     
     print("\n✅ All tests passed!")

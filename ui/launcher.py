@@ -53,7 +53,7 @@ class LauncherWindow(QWidget):
         self._set_inactive()
 
         # Visual grid preview + window hotkeys (disabled if effects are off in performance mode)
-        effects_enabled = self.config.get_ui("effects") and not self.config.data.get("performance_mode", False)
+        effects_enabled = self.config.get_ui("effects") and not self.config.get_performance_mode()
         if effects_enabled:
             self.grid_preview = GridPreview(cols=2, rows=2)
             self.win_hotkeys = WindowHotkeys(preview=self.grid_preview)
@@ -68,7 +68,7 @@ class LauncherWindow(QWidget):
         theme = ui_config.get("theme", "dark")
         accent = ui_config.get("accent", "#3a86ff")
         effects = ui_config.get("effects", True)
-        performance_mode = self.config.data.get("performance_mode", False)
+        performance_mode = self.config.get_performance_mode()
         
         # Adjust effects based on performance mode
         border_radius = "12px" if effects and not performance_mode else "8px"
