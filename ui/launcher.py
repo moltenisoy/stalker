@@ -3,25 +3,24 @@ from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QFont, QCursor, QGuiApplication
 from core.search import PredictiveSearch
 from core.engine import SearchResult
+from core.config import ConfigManager
 from modules.keystroke import send_text_ime_safe
 from modules.grid_preview import GridPreview
 from modules.hotkeys_window import WindowHotkeys
 
 class LauncherWindow(QWidget):
-    def __init__(self):
+    def __init__(self, config: ConfigManager = None):
         super().__init__(flags=Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setWindowFlag(Qt.WindowDoesNotAcceptFocus, False)
         self.setWindowModality(Qt.NonModal)
         self.setFocusPolicy(Qt.StrongFocus)
 
-        self.setStyleSheet("""
-        QWidget { background-color: rgba(15, 23, 42, 215); border-radius: 12px; color: #eaeaea; }
-        QLineEdit { padding: 10px 12px; border: 1px solid #3a86ff; border-radius: 8px; background: rgba(26, 32, 44, 230); color: #eaeaea; selection-background-color: #3a86ff; }
-        QListWidget { border: 1px solid #1f2937; border-radius: 8px; background: rgba(17, 24, 39, 230); outline: none; }
-        QListWidget::item { padding: 8px 10px; }
-        QListWidget::item:selected { background: #3a86ff; color: white; }
-        """)
+        # Load configuration
+        self.config = config or ConfigManager()
+        
+        # Apply theme from config
+        self._apply_theme()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -29,7 +28,11 @@ class LauncherWindow(QWidget):
 
         self.input = QLineEdit(self)
         self.input.setPlaceholderText("Apps, /files, /links, /clipboard, /snippets, /macros, /syshealth…")
-        self.input.setFont(QFont("Segoe UI", 11))
+        
+        # Apply font from config
+        font_family = self.config.get_ui("font_family")
+        font_size = self.config.get_ui("font_size")
+        self.input.setFont(QFont(font_family, font_size))
         self.input.textChanged.connect(self.on_text_changed)
         self.input.installEventFilter(self)
 
@@ -43,14 +46,76 @@ class LauncherWindow(QWidget):
         self.search.results_ready.connect(self.populate_results)
 
         self.resize(580, 380)
-        self._inactive_opacity = 0.6
-        self._active_opacity = 0.98
+        
+        # Apply opacity from config
+        self._inactive_opacity = self.config.get_ui("opacity_inactive")
+        self._active_opacity = self.config.get_ui("opacity_active")
         self._set_inactive()
 
-        # Visual grid preview + window hotkeys
-        self.grid_preview = GridPreview(cols=2, rows=2)
-        self.win_hotkeys = WindowHotkeys(preview=self.grid_preview)
-        self.win_hotkeys.register()
+        # Visual grid preview + window hotkeys (disabled if effects are off in performance mode)
+        effects_enabled = self.config.get_ui("effects") and not self.config.data.get("performance_mode", False)
+        if effects_enabled:
+            self.grid_preview = GridPreview(cols=2, rows=2)
+            self.win_hotkeys = WindowHotkeys(preview=self.grid_preview)
+            self.win_hotkeys.register()
+        else:
+            self.grid_preview = None
+            self.win_hotkeys = None
+
+    def _apply_theme(self):
+        """Apply theme colors and styles from config."""
+        ui_config = self.config.get_ui()
+        theme = ui_config.get("theme", "dark")
+        accent = ui_config.get("accent", "#3a86ff")
+        effects = ui_config.get("effects", True)
+        performance_mode = self.config.data.get("performance_mode", False)
+        
+        # Adjust effects based on performance mode
+        border_radius = "12px" if effects and not performance_mode else "8px"
+        
+        if theme == "dark":
+            bg_color = "rgba(15, 23, 42, 215)"
+            input_bg = "rgba(26, 32, 44, 230)"
+            list_bg = "rgba(17, 24, 39, 230)"
+            text_color = "#eaeaea"
+            border_color = "#1f2937"
+        else:  # light theme
+            bg_color = "rgba(245, 247, 251, 235)"
+            input_bg = "rgba(255, 255, 255, 240)"
+            list_bg = "rgba(242, 244, 247, 240)"
+            text_color = "#0f172a"
+            border_color = "#cbd5e1"
+        
+        stylesheet = f"""
+        QWidget {{ 
+            background-color: {bg_color}; 
+            border-radius: {border_radius}; 
+            color: {text_color}; 
+        }}
+        QLineEdit {{ 
+            padding: 10px 12px; 
+            border: 1px solid {accent}; 
+            border-radius: 8px; 
+            background: {input_bg}; 
+            color: {text_color}; 
+            selection-background-color: {accent}; 
+        }}
+        QListWidget {{ 
+            border: 1px solid {border_color}; 
+            border-radius: 8px; 
+            background: {list_bg}; 
+            outline: none; 
+        }}
+        QListWidget::item {{ 
+            padding: 8px 10px; 
+        }}
+        QListWidget::item:selected {{ 
+            background: {accent}; 
+            color: white; 
+        }}
+        """
+        
+        self.setStyleSheet(stylesheet)
 
     def center_and_show(self):
         screen = QCursor.pos()

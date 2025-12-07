@@ -2,16 +2,23 @@ from PySide6.QtGui import QPalette, QColor
 from PySide6.QtCore import Qt
 from ui.launcher import LauncherWindow
 from core.hotkey import GlobalHotkey
+from core.config import ConfigManager
 from services.autostart import ensure_autostart
 
 class LauncherApp:
     def __init__(self, qt_app):
         self.qt_app = qt_app
-        self.window = LauncherWindow()
-        self.hotkey = GlobalHotkey(self.toggle_visibility)
+        self.config = ConfigManager()
+        self.window = LauncherWindow(config=self.config)
+        
+        # Get hotkey from config
+        hotkey = self.config.data.get("hotkey", "ctrl+space")
+        self.hotkey = GlobalHotkey(self.toggle_visibility, hotkey=hotkey)
 
     def start(self):
-        self._apply_theme(dark=True)
+        # Apply theme from config
+        theme = self.config.get_ui("theme")
+        self._apply_theme(dark=(theme == "dark"))
         ensure_autostart()  # silently ensure autostart at logon
         self.hotkey.register()  # register global hotkey
         self.window.hide()      # start silent/minimized
@@ -23,8 +30,13 @@ class LauncherApp:
             self.window.center_and_show()
 
     def _apply_theme(self, dark=True):
+        """Apply global application theme from config."""
         palette = QPalette()
-        accent = QColor("#3a86ff")
+        
+        # Get accent color from config
+        accent_hex = self.config.get_ui("accent")
+        accent = QColor(accent_hex)
+        
         if dark:
             bg = QColor("#121212")
             fg = QColor("#eaeaea")

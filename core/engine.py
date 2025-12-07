@@ -140,12 +140,26 @@ class SearchEngine:
     def _toggle_perf(self):
         new_val = not self.config.data["performance_mode"]
         self.config.toggle_performance_mode(new_val)
-        if self.file_indexer:
-            self.file_indexer.pause(new_val)
+        
+        # Synchronize performance mode across all components
         if new_val:
-            # reduce visuals, disable AI usage
-            pass
-        log(f"performance_mode={new_val}")
+            # Enable performance mode: pause indexer, disable AI
+            if self.file_indexer:
+                self.file_indexer.pause(True)
+            if self.ai:
+                # Disable AI temporarily
+                self.ai = None
+            # Note: Visual effects are handled in UI layer via config
+            log("performance_mode=ON (indexer paused, AI disabled)")
+        else:
+            # Disable performance mode: resume indexer, re-enable AI
+            if self.file_indexer:
+                self.file_indexer.pause(False)
+                self.file_indexer.start()
+            # Re-enable AI if module is enabled
+            if self.config.data["modules"].get("ai") and not self.ai:
+                self.ai = AIAssistant()
+            log("performance_mode=OFF (indexer resumed, AI enabled)")
 
     def _toggle_module(self, key: str, val: bool):
         self.config.set_module_enabled(key, val)
