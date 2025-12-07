@@ -1,19 +1,106 @@
-"""
-Contextual Actions - One-tap actions based on active window and selection.
-Provides quick actions for text/selection in the active application.
-"""
+import json
+import time
+import threading
+import keyboard
+import mouse
+from dataclasses import dataclass, field
+from typing import List, Literal, Any, Callable, Optional
+from core import Storage
+from core import SearchResult
+
+EventType = Literal["key", "click"]
+
+@dataclass
+class MacroEvent:
+    t: EventType
+    data: Any
+    dt: float
+
+@dataclass
+class Macro:
+    name: str
+    events: List[MacroEvent] = field(default_factory=list)
+
+class MacroRecorder:
+    def __init__(self, storage: Optional[Storage] = None):
+        self.storage = storage or Storage()
+        self._recording = False
+        self._start_time = 0
+        self._events: List[MacroEvent] = []
+        self._registered = {}
+
+    def start(self):
+        if self._recording:
+            return
+        self._recording = True
+        self._start_time = time.time()
+        self._events = []
+        threading.Thread(target=self._record, daemon=True).start()
+
+    def stop_and_save(self, name: str):
+        self._recording = False
+        macro = {"name": name, "events": [e.__dict__ for e in self._events]}
+        self.storage.add_quicklink(name=name, target=json.dumps(macro), kind="command", category="macro")
+        return macro
+
+    def _record(self):
+        def on_key(e):
+            if not self._recording:
+                return
+            self._events.append(MacroEvent("key", {"name": e.name, "event_type": e.event_type}, time.time() - self._start_time))
+        def on_click(x, y, button, pressed):
+            if not self._recording:
+                return
+            self._events.append(MacroEvent("click", {"x": x, "y": y, "button": button, "pressed": pressed}, time.time() - self._start_time))
+        keyboard.hook(on_key, suppress=False)
+        mouse.hook(on_click)
+        while self._recording:
+            time.sleep(0.05)
+        keyboard.unhook(on_key)
+        mouse.unhook(on_click)
+
+    def playback(self, macro_data: dict):
+        events = [MacroEvent(**e) for e in macro_data.get("events", [])]
+        last_dt = 0
+        for ev in events:
+            time.sleep(max(0, ev.dt - last_dt))
+            last_dt = ev.dt
+            if ev.t == "key":
+                if ev.data.get("event_type") == "down":
+                    keyboard.press(ev.data["name"])
+                elif ev.data.get("event_type") == "up":
+                    keyboard.release(ev.data["name"])
+            elif ev.t == "click":
+                if ev.data.get("pressed"):
+                    mouse.press(ev.data["x"], ev.data["y"], button=ev.data["button"])
+                else:
+                    mouse.release(ev.data["x"], ev.data["y"], button=ev.data["button"])
+
+    def search_macros(self, q: str = "", limit: int = 30):
+        results = []
+        for link in self.storage.list_quicklinks(q=q, limit=limit):
+            if link["category"] != "macro":
+                continue
+            macro_data = json.loads(link["target"])
+            results.append(
+                SearchResult(
+                    title=f"Macro: {macro_data['name']}",
+                    subtitle=f"{len(macro_data.get('events', []))} eventos",
+                    action=lambda m=macro_data: self.playback(m),
+                    group="macro",
+                )
+            )
+        return results
+
+
+
 import re
 import win32clipboard
 import win32gui
 from typing import List, Optional, Dict
-from core.types import SearchResult
-from modules.keystroke import send_text_ime_safe
+from core import SearchResult
 
 class ContextualActionsManager:
-    """
-    Manages contextual actions based on active window and clipboard content.
-    Provides one-tap actions for common text operations.
-    """
     
     def __init__(self):
         self.last_clipboard = ""
@@ -21,7 +108,6 @@ class ContextualActionsManager:
         self.active_window_class = ""
     
     def update_active_window(self):
-        """Update information about the active window."""
         try:
             hwnd = win32gui.GetForegroundWindow()
             self.active_window_title = win32gui.GetWindowText(hwnd)
@@ -30,7 +116,6 @@ class ContextualActionsManager:
             print(f"Error getting active window: {e}")
     
     def get_clipboard_content(self) -> str:
-        """Get current clipboard content."""
         try:
             win32clipboard.OpenClipboard()
             content = win32clipboard.GetClipboardData()
@@ -41,7 +126,6 @@ class ContextualActionsManager:
             return ""
     
     def set_clipboard_content(self, text: str):
-        """Set clipboard content."""
         try:
             win32clipboard.OpenClipboard()
             win32clipboard.EmptyClipboard()
@@ -51,30 +135,18 @@ class ContextualActionsManager:
             print(f"Error setting clipboard: {e}")
     
     def get_available_actions(self, query: str = "") -> List[SearchResult]:
-        """
-        Get available contextual actions based on current context.
-        
-        Args:
-            query: Optional search query to filter actions
-            
-        Returns:
-            List of available actions as SearchResults
-        """
         self.update_active_window()
         clipboard_content = self.get_clipboard_content()
         
         actions = []
         
-        # Always available actions
         actions.extend(self._get_paste_actions(clipboard_content))
         
-        # Text transformation actions
         if clipboard_content and clipboard_content.strip():
             actions.extend(self._get_transform_actions(clipboard_content))
             actions.extend(self._get_format_actions(clipboard_content))
             actions.extend(self._get_extraction_actions(clipboard_content))
         
-        # Filter by query if provided
         if query:
             qlow = query.lower()
             actions = [a for a in actions if qlow in a.title.lower() or qlow in a.subtitle.lower()]
@@ -82,10 +154,8 @@ class ContextualActionsManager:
         return actions
     
     def _get_paste_actions(self, clipboard_content: str) -> List[SearchResult]:
-        """Get paste-related actions."""
         actions = []
         
-        # Paste plain text (without formatting)
         actions.append(SearchResult(
             title="📋 Pegar Texto Plano",
             subtitle="Pegar sin formato (IME-safe)",
@@ -93,7 +163,6 @@ class ContextualActionsManager:
             group="context_paste"
         ))
         
-        # Paste and go (for URLs)
         if self._is_url(clipboard_content):
             actions.append(SearchResult(
                 title="🌐 Pegar y Navegar",
@@ -105,10 +174,8 @@ class ContextualActionsManager:
         return actions
     
     def _get_transform_actions(self, text: str) -> List[SearchResult]:
-        """Get text transformation actions."""
         actions = []
         
-        # Uppercase
         actions.append(SearchResult(
             title="🔠 MAYÚSCULAS",
             subtitle=f"Convertir a mayúsculas: {text[:50]}...",
@@ -116,7 +183,6 @@ class ContextualActionsManager:
             group="context_transform"
         ))
         
-        # Lowercase
         actions.append(SearchResult(
             title="🔡 minúsculas",
             subtitle=f"Convertir a minúsculas: {text[:50]}...",
@@ -124,7 +190,6 @@ class ContextualActionsManager:
             group="context_transform"
         ))
         
-        # Title Case
         actions.append(SearchResult(
             title="🔤 Título",
             subtitle=f"Convertir a Título: {text[:50]}...",
@@ -135,10 +200,8 @@ class ContextualActionsManager:
         return actions
     
     def _get_format_actions(self, text: str) -> List[SearchResult]:
-        """Get formatting actions."""
         actions = []
         
-        # Clean format (remove extra spaces, special chars)
         actions.append(SearchResult(
             title="✨ Limpiar Formato",
             subtitle="Eliminar formato, espacios extra y caracteres especiales",
@@ -146,7 +209,6 @@ class ContextualActionsManager:
             group="context_format"
         ))
         
-        # Remove line breaks
         if '\n' in text or '\r' in text:
             actions.append(SearchResult(
                 title="📏 Unir Líneas",
@@ -155,7 +217,6 @@ class ContextualActionsManager:
                 group="context_format"
             ))
         
-        # Quote text
         actions.append(SearchResult(
             title='💬 Entrecomillar',
             subtitle='Agregar comillas alrededor del texto',
@@ -166,10 +227,8 @@ class ContextualActionsManager:
         return actions
     
     def _get_extraction_actions(self, text: str) -> List[SearchResult]:
-        """Get extraction actions."""
         actions = []
         
-        # Extract URLs
         urls = self._extract_urls(text)
         if urls:
             actions.append(SearchResult(
@@ -179,7 +238,6 @@ class ContextualActionsManager:
                 group="context_extract"
             ))
         
-        # Extract emails
         emails = self._extract_emails(text)
         if emails:
             actions.append(SearchResult(
@@ -189,7 +247,6 @@ class ContextualActionsManager:
                 group="context_extract"
             ))
         
-        # Extract numbers
         numbers = self._extract_numbers(text)
         if numbers:
             actions.append(SearchResult(
@@ -199,7 +256,6 @@ class ContextualActionsManager:
                 group="context_extract"
             ))
         
-        # Table to CSV (if text looks like a table)
         if self._looks_like_table(text):
             actions.append(SearchResult(
                 title="📊 Convertir a CSV",
@@ -210,16 +266,13 @@ class ContextualActionsManager:
         
         return actions
     
-    # Action implementations
     
     def _paste_plain(self):
-        """Paste plain text without formatting."""
         text = self.get_clipboard_content()
         if text:
             send_text_ime_safe(text)
     
     def _paste_and_go(self):
-        """Paste and press Enter (useful for URLs)."""
         text = self.get_clipboard_content()
         if text:
             send_text_ime_safe(text)
@@ -227,7 +280,6 @@ class ContextualActionsManager:
             keyboard.send('enter')
     
     def _transform_and_paste(self, text: str, transform_type: str):
-        """Transform text and paste."""
         if transform_type == "uppercase":
             result = text.upper()
         elif transform_type == "lowercase":
@@ -240,30 +292,24 @@ class ContextualActionsManager:
         send_text_ime_safe(result)
     
     def _clean_and_paste(self, text: str):
-        """Clean formatting and paste."""
-        # Remove extra whitespace
         cleaned = re.sub(r'\s+', ' ', text)
         cleaned = cleaned.strip()
         
-        # Remove common special characters that cause issues
         cleaned = cleaned.replace('\u200b', '')  # Zero-width space
         cleaned = cleaned.replace('\ufeff', '')  # BOM
         
         send_text_ime_safe(cleaned)
     
     def _remove_linebreaks_and_paste(self, text: str):
-        """Remove line breaks and paste."""
         result = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
         result = re.sub(r'\s+', ' ', result).strip()
         send_text_ime_safe(result)
     
     def _quote_and_paste(self, text: str):
-        """Add quotes around text and paste."""
         result = f'"{text}"'
         send_text_ime_safe(result)
     
     def _extract_and_paste(self, text: str, extract_type: str):
-        """Extract specific content and paste."""
         if extract_type == "urls":
             items = self._extract_urls(text)
         elif extract_type == "emails":
@@ -277,12 +323,10 @@ class ContextualActionsManager:
         send_text_ime_safe(result)
     
     def _table_to_csv_and_paste(self, text: str):
-        """Convert table-like text to CSV and paste."""
         lines = text.split('\n')
         csv_lines = []
         
         for line in lines:
-            # Try to detect separator (tab, multiple spaces, pipe)
             if '\t' in line:
                 cells = line.split('\t')
             elif '|' in line:
@@ -290,45 +334,40 @@ class ContextualActionsManager:
             else:
                 cells = re.split(r'\s{2,}', line)
             
-            # Quote cells that contain commas
             quoted_cells = [f'"{cell}"' if ',' in cell else cell for cell in cells]
             csv_lines.append(','.join(quoted_cells))
         
         result = '\n'.join(csv_lines)
         send_text_ime_safe(result)
     
-    # Helper methods
     
     def _is_url(self, text: str) -> bool:
-        """Check if text is a URL."""
-        from core.patterns import is_url
+        from core import is_url
         return is_url(text)
     
     def _extract_urls(self, text: str) -> List[str]:
-        """Extract URLs from text."""
-        from core.patterns import extract_urls
+        from core import extract_urls
         return extract_urls(text)
     
     def _extract_emails(self, text: str) -> List[str]:
-        """Extract email addresses from text."""
-        from core.patterns import extract_emails
+        from core import extract_emails
         return extract_emails(text)
     
     def _extract_numbers(self, text: str) -> List[str]:
-        """Extract numbers from text."""
-        from core.patterns import extract_numbers
+        from core import extract_numbers
         return extract_numbers(text)
     
     def _looks_like_table(self, text: str) -> bool:
-        """Check if text looks like a table."""
         lines = text.split('\n')
         if len(lines) < 2:
             return False
         
-        # Check if multiple lines have tabs or multiple spaces (suggesting columns)
         table_lines = 0
         for line in lines:
             if '\t' in line or re.search(r'\s{2,}', line) or '|' in line:
                 table_lines += 1
         
         return table_lines >= len(lines) * 0.5  # At least 50% of lines look like table rows
+
+
+

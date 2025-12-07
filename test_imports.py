@@ -17,11 +17,11 @@ except Exception as e:
 
 try:
     print("✓ Importing core modules...")
-    from core.app import LauncherApp
-    from core.config import ConfigManager
-    from core.engine import SearchEngine
-    from core.search import PredictiveSearch
-    from core.types import SearchResult
+    from core import LauncherApp
+    from core import ConfigManager
+    from core import SearchEngine
+    from core import PredictiveSearch
+    from core import SearchResult
     print("  SUCCESS")
 except Exception as e:
     print(f"  FAILED: {e}")
@@ -29,7 +29,7 @@ except Exception as e:
 
 try:
     print("✓ Importing UI modules...")
-    from ui.launcher import LauncherWindow
+    from ui import LauncherWindow
     print("  SUCCESS")
 except Exception as e:
     print(f"  FAILED: {e}")
@@ -37,11 +37,11 @@ except Exception as e:
 
 try:
     print("✓ Importing module components...")
-    from modules.calculator import Calculator
-    from modules.app_launcher import AppLauncher
-    from modules.clipboard_manager import ClipboardManager
-    from modules.snippet_manager import SnippetManager
-    from modules.file_indexer import FileIndexer
+    from modules_system import Calculator
+    from modules_files import AppLauncher
+    from modules_system import ClipboardManager
+    from modules_system import SnippetManager
+    from modules_files import FileIndexer
     print("  SUCCESS")
 except Exception as e:
     print(f"  FAILED: {e}")
@@ -49,7 +49,7 @@ except Exception as e:
 
 try:
     print("✓ Importing services...")
-    from services.autostart import ensure_autostart
+    from services import ensure_autostart
     print("  SUCCESS")
 except Exception as e:
     print(f"  FAILED: {e}")
@@ -68,7 +68,7 @@ except Exception as e:
 
 try:
     print("✓ Testing Storage...")
-    from core.storage import Storage
+    from core import Storage
     storage = Storage()
     print("  Storage initialized successfully")
     print("  SUCCESS")

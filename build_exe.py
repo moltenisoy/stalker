@@ -31,7 +31,7 @@ def calculate_checksum(filepath, algorithm='sha256'):
 
 def get_version():
     """Extract version from code or use default."""
-    version_file = Path(__file__).parent / "core" / "__init__.py"
+    version_file = Path(__file__).parent / "core.py"
     if version_file.exists():
         with open(version_file, 'r') as f:
             for line in f:
