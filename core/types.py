@@ -2,8 +2,8 @@
 Core types shared across the application.
 This module avoids circular import issues.
 """
-from dataclasses import dataclass
-from typing import Callable, Optional
+from dataclasses import dataclass, field
+from typing import Callable, Optional, Dict, Any
 
 @dataclass
 class SearchResult:
@@ -13,5 +13,5 @@ class SearchResult:
     action: Optional[Callable] = None
     copy_text: Optional[str] = None
     group: str = "general"
-    meta: dict = None
+    meta: Optional[Dict[str, Any]] = None
     score: float = 0.0  # Higher score = higher priority

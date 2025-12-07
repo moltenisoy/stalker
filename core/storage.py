@@ -298,9 +298,9 @@ class Storage:
             args.append(f"%{q}%")
         sql += " ORDER BY created_at DESC LIMIT ?"
         args.append(limit)
-        conn = self._conn()
-        conn.row_factory = sqlite3.Row
-        return conn.execute(sql, args).fetchall()
+        with self._conn() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(sql, args).fetchall()
     
     def list_snippets(self, q: str = "", limit: int = 50):
         """List snippets."""
@@ -311,16 +311,16 @@ class Storage:
             args.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
         sql += " ORDER BY created_at DESC LIMIT ?"
         args.append(limit)
-        conn = self._conn()
-        conn.row_factory = sqlite3.Row
-        return conn.execute(sql, args).fetchall()
+        with self._conn() as conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(sql, args).fetchall()
     
     def get_snippet_by_trigger(self, trigger: str):
         """Get a snippet by its trigger."""
-        conn = self._conn()
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM snippets WHERE trigger=?", (trigger,)).fetchone()
-        return dict(row) if row else None
+        with self._conn() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM snippets WHERE trigger=?", (trigger,)).fetchone()
+            return dict(row) if row else None
     
     def add_quicklink(self, name: str, target: str, kind: str, category: str = "", args: str = "", icon: str = "", hotkey: str = None):
         """Add a quicklink entry."""

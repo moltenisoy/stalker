@@ -1,12 +1,12 @@
 @echo off
 REM =====================================
-REM Stalker - Script de Instalacion
+REM Stalker - Script de Instalación
 REM Instala dependencias y prepara el proyecto
 REM =====================================
 
 echo.
 echo ==========================================
-echo   Stalker - Instalacion de Dependencias
+echo   Stalker - Instalación de Dependencias
 echo ==========================================
 echo.
 
