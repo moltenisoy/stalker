@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QMessageBox
 from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QFont, QCursor, QGuiApplication
 from core.search import PredictiveSearch
@@ -228,16 +228,60 @@ class LauncherWindow(QWidget):
             self.hide()
 
     def _kill_current_if_process(self):
+        """Kill current process with optional confirmation (Ctrl+W)."""
         current = self.list.currentItem()
         if not current:
             return
+        
         res: SearchResult = current.data(Qt.UserRole)
-        if res and res.group == "process" and res.meta and "pid" in res.meta:
-            try:
-                res.action()  # kill
-            except Exception as ex:
-                print(f"Error al terminar proceso: {ex}")
-            self.hide()
+        if not res or res.group != "process" or not res.meta or "pid" not in res.meta:
+            return
+        
+        pid = res.meta["pid"]
+        name = res.meta.get("name", "Unknown")
+        
+        # Check if confirmation is enabled
+        confirm_kill = True
+        if self.config:
+            confirm_kill = self.config.get_syshealth_config("confirm_kill")
+        
+        # Show confirmation dialog if enabled
+        if confirm_kill:
+            reply = QMessageBox.question(
+                self,
+                "Confirmar terminación de proceso",
+                f"¿Está seguro de que desea terminar el proceso?\n\n"
+                f"Nombre: {name}\n"
+                f"PID: {pid}\n\n"
+                f"Esta acción no se puede deshacer.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply != QMessageBox.Yes:
+                return
+        
+        # Get syshealth instance from search engine
+        if hasattr(self.search, 'engine') and hasattr(self.search.engine, 'syshealth'):
+            syshealth = self.search.engine.syshealth
+            if syshealth:
+                success, message = syshealth.kill(pid)
+                
+                # Show feedback
+                if success:
+                    QMessageBox.information(self, "Éxito", message)
+                else:
+                    QMessageBox.warning(self, "Error", message)
+                
+                # Hide launcher and refresh results
+                self.hide()
+                if success:
+                    # Trigger refresh of search results
+                    self.on_text_changed(self.input.text())
+            else:
+                QMessageBox.warning(self, "Error", "Módulo SysHealth no disponible")
+        else:
+            QMessageBox.warning(self, "Error", "No se puede acceder al módulo SysHealth")
 
     def _copy_text(self, text: str):
         QGuiApplication.clipboard().setText(text)

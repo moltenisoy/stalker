@@ -31,6 +31,15 @@ _DEFAULTS: Dict[str, Any] = {
         "roots": [],  # Empty means use home directory as default
         "watch_enabled": False,  # Optional watchdog feature
     },
+    "syshealth": {
+        "sampling_interval": 2.0,  # Seconds between samples (low overhead)
+        "process_refresh_interval": 3.0,  # Seconds between process list updates
+        "process_limit": 15,  # Max processes to display
+        "confirm_kill": True,  # Ask for confirmation before killing process
+        "overlay_enabled": False,  # Show persistent system health overlay
+        "overlay_update_interval": 5.0,  # Seconds between overlay updates
+        "overlay_position": "top-right",  # Position of overlay: top-left, top-right, bottom-left, bottom-right
+    },
 }
 
 
@@ -288,4 +297,19 @@ class ConfigManager:
         if "file_indexer" not in self.data:
             self.data["file_indexer"] = copy.deepcopy(_DEFAULTS["file_indexer"])
         self.data["file_indexer"]["watch_enabled"] = bool(enabled)
+        self.save()
+
+    def get_syshealth_config(self, key: Optional[str] = None) -> Any:
+        """Get syshealth configuration value(s)."""
+        default_config = _DEFAULTS.get("syshealth", {})
+        syshealth_config = self.data.get("syshealth", default_config)
+        if key is None:
+            return syshealth_config
+        return syshealth_config.get(key, default_config.get(key))
+
+    def set_syshealth_config(self, **kwargs):
+        """Update syshealth configuration."""
+        if "syshealth" not in self.data:
+            self.data["syshealth"] = copy.deepcopy(_DEFAULTS["syshealth"])
+        self.data["syshealth"].update(kwargs)
         self.save()
