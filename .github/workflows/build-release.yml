@@ -15,6 +15,9 @@ jobs:
   build:
     name: Build Windows Executable
     runs-on: windows-latest
+    permissions:
+      contents: write  # Required for creating releases
+      actions: read
     
     steps:
       - name: Checkout code
@@ -107,6 +110,9 @@ jobs:
   test-build:
     name: Test Build on Windows
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
     
     steps:
       - name: Checkout code
