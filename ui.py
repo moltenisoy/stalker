@@ -128,11 +128,11 @@ class NotesEditor(QWidget):
         if notes is not None:
             self.notes = notes
         else:
-            if NotesManager is None:
+            try:
                 from modules_ai import NotesManager as _NotesManager
                 self.notes = _NotesManager()
-            else:
-                self.notes = NotesManager()
+            except Exception:
+                self.notes = None
         self.setWindowTitle("Notas")
         layout = QVBoxLayout(self)
         self.title = QLineEdit(self)
@@ -947,7 +947,7 @@ class GridPreview:
 
 
 class WindowHotkeys:
-    def __init__(self, preview: GridPreview | None = None):
+    def __init__(self, preview: Optional[GridPreview] = None):
         self.preview = preview
 
     def register(self):

@@ -7,6 +7,7 @@ import sys as _sys
 # Allow `import core.config` to resolve to this module for compatibility
 _sys.modules.setdefault("core.config", _sys.modules[__name__])
 _sys.modules.setdefault("core.storage", _sys.modules[__name__])
+# Expose a module-like attribute so callers using ``import core.storage`` work in a flat layout
 storage = _sys.modules[__name__]
 
 @dataclass

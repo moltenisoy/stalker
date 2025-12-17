@@ -212,7 +212,7 @@ class INPUT(Structure):
 
 def _send_vk(vk, flags=0):
     try:
-        if not hasattr(windll, "user32"):
+        if not windll or not hasattr(windll, "user32"):
             return
         ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=0)
         inp = INPUT(type=win32con.INPUT_KEYBOARD, ki=ki)
@@ -230,17 +230,22 @@ def send_text_ime_safe(text: str):
     if not text:
         return
     try:
-        win32clipboard.OpenClipboard()
         try:
-            if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
-                backup = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-            else:
+            win32clipboard.OpenClipboard()
+            try:
+                if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+                    backup = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+                else:
+                    backup = None
+            except Exception:
                 backup = None
-        except Exception:
-            backup = None
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardText(text, win32con.CF_UNICODETEXT)
-        win32clipboard.CloseClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardText(text, win32con.CF_UNICODETEXT)
+        finally:
+            try:
+                win32clipboard.CloseClipboard()
+            except Exception:
+                pass
     except Exception:
         backup = None
 
