@@ -25,6 +25,9 @@ def SetClipboardText(text, format=None):
     return True
 
 
+def SetClipboardData(format, text):
+    return SetClipboardText(text, format)
+
+
 def IsClipboardFormatAvailable(format):
     return bool(_clipboard_content)
-
