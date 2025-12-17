@@ -8,6 +8,8 @@ import sys as _sys
 _sys.modules.setdefault("core.config", _sys.modules[__name__])
 _sys.modules.setdefault("core.storage", _sys.modules[__name__])
 # Expose module-like attributes so callers using ``import core.storage`` work in a flat layout
+# This shim keeps legacy import patterns (core.config/core.storage) working even though the
+# project is structured as a single-module file in this workspace.
 config = storage = _sys.modules[__name__]
 
 @dataclass

@@ -120,7 +120,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPlainTextEdit, Q
 from PySide6.QtCore import Qt
 try:
     from modules_ai import NotesManager
-except Exception:
+except (ImportError, ModuleNotFoundError):
     NotesManager = None
 
 class NotesEditor(QWidget):
@@ -132,7 +132,7 @@ class NotesEditor(QWidget):
             try:
                 from modules_ai import NotesManager as _NotesManager
                 self.notes = _NotesManager()
-            except Exception:
+            except (ImportError, ModuleNotFoundError):
                 self.notes = None
         self.setWindowTitle("Notas")
         layout = QVBoxLayout(self)
