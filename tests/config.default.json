@@ -1,0 +1,38 @@
+{
+  "ui": {
+    "font_family": "Segoe UI",
+    "font_size": 11,
+    "theme": "dark",
+    "opacity_active": 0.98,
+    "opacity_inactive": 0.6,
+    "accent": "#3a86ff",
+    "effects": true
+  },
+  "hotkey": "ctrl+space",
+  "modules": {
+    "optimizer": true,
+    "clipboard": true,
+    "snippets": true,
+    "ai": true,
+    "files": true,
+    "links": true,
+    "macros": true
+  },
+  "performance_mode": false,
+  "plugin_shell": {
+    "enabled": true
+  },
+  "file_indexer": {
+    "roots": [],
+    "watch_enabled": false
+  },
+  "syshealth": {
+    "sampling_interval": 2.0,
+    "process_refresh_interval": 3.0,
+    "process_limit": 15,
+    "confirm_kill": true,
+    "overlay_enabled": false,
+    "overlay_update_interval": 5.0,
+    "overlay_position": "top-right"
+  }
+}

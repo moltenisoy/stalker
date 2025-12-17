@@ -4,6 +4,7 @@ from typing import List, Optional
 from pathlib import Path
 from core import Storage
 from core import SearchResult
+from modules_system import log
 
 COMMON_APPS = {
     "cal": ("Calculadora", "calc.exe"),
@@ -340,5 +341,4 @@ class Quicklinks:
         else:
             cmd = f"{target} {args}".strip()
             subprocess.Popen(cmd, shell=True)
-
 
