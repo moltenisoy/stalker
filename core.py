@@ -2,6 +2,15 @@ __version__ = "2.0.0"
 
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Dict, Any
+import sys as _sys
+
+# Allow `import core.config` to resolve to this module for compatibility
+_sys.modules.setdefault("core.config", _sys.modules[__name__])
+_sys.modules.setdefault("core.storage", _sys.modules[__name__])
+# Expose module-like attributes so callers using ``import core.storage`` work in a flat layout
+# This shim keeps legacy import patterns (core.config/core.storage) working even though the
+# project is structured as a single-module file in this workspace.
+config = storage = _sys.modules[__name__]
 
 @dataclass
 class SearchResult:
@@ -1492,7 +1501,7 @@ def _get_bundled_config_path() -> Path:
     if getattr(sys, 'frozen', False):
         bundle_dir = Path(sys._MEIPASS)
     else:
-        bundle_dir = Path(__file__).parent.parent
+        bundle_dir = Path(__file__).parent
     
     return bundle_dir / "config.default.json"
 
@@ -1515,6 +1524,22 @@ def _copy_default_config_on_first_run():
     else:
         print(f"Warning: Default config not found at {default_config_path}")
 
+
+def _ensure_packaging_default_config():
+    """
+    Some build scripts expect config.default.json one level above the package directory.
+    Ensure it exists by copying the bundled version when missing.
+    """
+    source = _get_bundled_config_path()
+    target = Path(__file__).parent.parent / "config.default.json"
+    if source.exists() and not target.exists():
+        try:
+            target.write_bytes(source.read_bytes())
+        except Exception:
+            pass
+
+
+_ensure_packaging_default_config()
 _DEFAULTS: Dict[str, Any] = {
     "ui": {
         "font_family": "Segoe UI",
@@ -1803,8 +1828,6 @@ from modules_files import FileIndexer
 from modules_files import Quicklinks
 from modules_automation import MacroRecorder
 from modules_monitoring import SysHealth
-from modules_ai import AIAssistant
-from modules_ai import NotesManager
 from modules_system import PluginShell
 from modules_system import log
 from modules_automation import ContextualActionsManager
@@ -1815,6 +1838,7 @@ class SearchEngine:
         self.config = config or ConfigManager()
         perf = self.config.get_performance_mode()
 
+        from modules_ai import AIAssistant, NotesManager
         self.calculator = Calculator()
         self.clipboard_mgr = ClipboardManager() if self.config.get_module_enabled("clipboard") else None
         self.snippet_mgr = SnippetManager() if self.config.get_module_enabled("snippets") else None
@@ -2503,5 +2527,3 @@ class LauncherApp:
         palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
         self.qt_app.setPalette(palette)
         self.qt_app.setStyle("Fusion")
-
-

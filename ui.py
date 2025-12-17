@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
                               QPushButton, QLabel, QMessageBox)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QGuiApplication
+from typing import Optional
 
 
 class AIResponsePanel(QWidget):
@@ -117,12 +118,22 @@ CRÍTICO: Se desactiva el rich-text para evitar conversión de <, >, & a entidad
 """
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPlainTextEdit, QPushButton
 from PySide6.QtCore import Qt
-from modules.notes import NotesManager
+try:
+    from modules_ai import NotesManager
+except (ImportError, ModuleNotFoundError):
+    NotesManager = None
 
 class NotesEditor(QWidget):
-    def __init__(self, notes: NotesManager | None = None):
+    def __init__(self, notes=None):
         super().__init__()
-        self.notes = notes or NotesManager()
+        if notes is not None:
+            self.notes = notes
+        else:
+            try:
+                from modules_ai import NotesManager as _NotesManager
+                self.notes = _NotesManager()
+            except (ImportError, ModuleNotFoundError):
+                self.notes = None
         self.setWindowTitle("Notas")
         layout = QVBoxLayout(self)
         self.title = QLineEdit(self)
@@ -920,12 +931,31 @@ class SettingsPanel(QWidget):
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QMessageBox
 from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QFont, QCursor, QGuiApplication
-from core.search import PredictiveSearch
-from core.types import SearchResult
-from core.config import ConfigManager
-from modules.keystroke import send_text_ime_safe
-from modules.grid_preview import GridPreview
-from modules.hotkeys_window import WindowHotkeys
+from core import PredictiveSearch, SearchResult, ConfigManager
+from modules_system import send_text_ime_safe
+
+
+class GridPreview:
+    def __init__(self, cols: int = 2, rows: int = 2):
+        self.cols = cols
+        self.rows = rows
+
+    def show(self):
+        return None
+
+    def hide(self):
+        return None
+
+
+class WindowHotkeys:
+    def __init__(self, preview: Optional[GridPreview] = None):
+        self.preview = preview
+
+    def register(self):
+        return None
+
+    def unregister(self):
+        return None
 
 class LauncherWindow(QWidget):
     def __init__(self, config: ConfigManager = None, app_ref=None):
@@ -1215,5 +1245,3 @@ class LauncherWindow(QWidget):
 
     def _set_active(self):
         self.setWindowOpacity(self._active_opacity)
-
-

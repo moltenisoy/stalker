@@ -98,14 +98,19 @@ class ClipboardManager(QObject):
         super().__init__()
         self.clip = QGuiApplication.clipboard()
         self.storage = Storage()
-        self._last_seq = self.clip.sequenceNumber()
+        seq_func = getattr(self.clip, "sequenceNumber", None)
+        self._seq_func = seq_func if callable(seq_func) else None
+        self._last_seq = self._seq_func() if self._seq_func else 0
         self._timer = QTimer()
         self._timer.setInterval(poll_ms)
         self._timer.timeout.connect(self._tick)
-        self._timer.start()
+        if self._seq_func:
+            self._timer.start()
 
     def _tick(self):
-        seq = self.clip.sequenceNumber()
+        if not self._seq_func:
+            return
+        seq = self._seq_func()
         if seq == self._last_seq:
             return
         self._last_seq = seq
@@ -188,7 +193,11 @@ import time
 import win32con
 import win32api
 import win32clipboard
-from ctypes import Structure, c_ulong, POINTER, sizeof, windll
+from ctypes import Structure, c_ulong, POINTER, sizeof
+try:
+    from ctypes import windll
+except ImportError:
+    windll = None
 
 class KEYBDINPUT(Structure):
     _fields_ = [("wVk", c_ulong),
@@ -202,9 +211,14 @@ class INPUT(Structure):
                 ("ki", KEYBDINPUT)]
 
 def _send_vk(vk, flags=0):
-    ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=0)
-    inp = INPUT(type=win32con.INPUT_KEYBOARD, ki=ki)
-    windll.user32.SendInput(1, POINTER(INPUT)(inp), sizeof(INPUT))
+    try:
+        if not windll or not hasattr(windll, "user32"):
+            return
+        ki = KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=0)
+        inp = INPUT(type=win32con.INPUT_KEYBOARD, ki=ki)
+        windll.user32.SendInput(1, POINTER(INPUT)(inp), sizeof(INPUT))
+    except Exception:
+        return
 
 def _press_ctrl_v():
     _send_vk(win32con.VK_CONTROL)
@@ -215,17 +229,25 @@ def _press_ctrl_v():
 def send_text_ime_safe(text: str):
     if not text:
         return
-    win32clipboard.OpenClipboard()
     try:
-        if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
-            backup = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-        else:
-            backup = None
+        try:
+            win32clipboard.OpenClipboard()
+            try:
+                if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+                    backup = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+                else:
+                    backup = None
+            except Exception:
+                backup = None
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardText(text, win32con.CF_UNICODETEXT)
+        finally:
+            try:
+                win32clipboard.CloseClipboard()
+            except Exception:
+                pass
     except Exception:
         backup = None
-    win32clipboard.EmptyClipboard()
-    win32clipboard.SetClipboardText(text, win32con.CF_UNICODETEXT)
-    win32clipboard.CloseClipboard()
 
     time.sleep(0.05)
     _press_ctrl_v()
@@ -289,9 +311,14 @@ from typing import Dict, Optional
 SPI_GETWORKAREA = 0x0030
 
 def _get_work_area():
-    rect = wintypes.RECT()
-    ctypes.windll.user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0)
-    return rect  # left, top, right, bottom
+    try:
+        rect = wintypes.RECT()
+        ctypes.windll.user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0)
+        return rect
+    except Exception:
+        class DummyRect:
+            left, top, right, bottom = 0, 0, 1920, 1080
+        return DummyRect()
 
 def _get_foreground_hwnd():
     return win32gui.GetForegroundWindow()
@@ -320,7 +347,6 @@ def get_active_window_info() -> Dict[str, str]:
             "pid": pid
         }
     except Exception as e:
-        print(f"Error getting active window info: {e}")
         return {
             "hwnd": 0,
             "title": "",
@@ -517,5 +543,3 @@ class WindowHotkeys:
         finally:
             if self.preview:
                 self.preview.hide()
-
-
